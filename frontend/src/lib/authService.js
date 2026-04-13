@@ -94,7 +94,24 @@ export async function submitOnboarding(data, token) {
 
     if (!response.ok) {
       const error = await response.json()
-      throw new Error(error.detail || 'Failed to submit onboarding')
+      const detail = error?.detail
+      let message = 'Failed to submit onboarding'
+
+      if (typeof detail === 'string') {
+        message = detail
+      } else if (Array.isArray(detail) && detail.length > 0) {
+        const first = detail[0]
+        if (typeof first === 'string') {
+          message = first
+        } else {
+          const loc = Array.isArray(first?.loc) ? first.loc.join('.') : 'field'
+          message = `${loc}: ${first?.msg || 'Invalid value'}`
+        }
+      } else if (detail && typeof detail === 'object') {
+        message = JSON.stringify(detail)
+      }
+
+      throw new Error(message)
     }
 
     return await response.json()

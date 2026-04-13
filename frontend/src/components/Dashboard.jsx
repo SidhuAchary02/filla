@@ -5,6 +5,14 @@ import { logout as logoutService } from '../lib/authService'
 export default function Dashboard() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const profile = user?.profile || {}
+  const skills = Array.isArray(profile.skills) ? profile.skills : []
+  const workExperience = Array.isArray(profile.work_experience) ? profile.work_experience : []
+  const education = Array.isArray(profile.education) ? profile.education : []
+  const projects = Array.isArray(profile.projects) ? profile.projects : []
+  const languages = Array.isArray(profile.languages) ? profile.languages : []
+  const location = profile.location || {}
+  const links = profile.links || {}
 
   const handleLogout = () => {
     logoutService()
@@ -50,24 +58,38 @@ export default function Dashboard() {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Profile</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <p className="text-sm text-gray-600">Full Name</p>
+                  <p className="text-sm text-gray-600">Role</p>
                   <p className="text-lg font-medium text-gray-900">
-                    {user.profile.full_name || 'Not provided'}
+                    {profile.role || 'Not provided'}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-gray-600">Phone</p>
+                  <p className="text-sm text-gray-600">Experience Level</p>
                   <p className="text-lg font-medium text-gray-900">
-                    {user.profile.phone || 'Not provided'}
+                    {profile.experience_level || 'Not provided'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-gray-600">Location</p>
+                  <p className="text-lg font-medium text-gray-900">
+                    {[location.city, location.state, location.country].filter(Boolean).join(', ') || 'Not provided'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-gray-600">Minimum Salary</p>
+                  <p className="text-lg font-medium text-gray-900">
+                    {profile.min_salary ? `₹${Number(profile.min_salary).toLocaleString()}` : 'Not provided'}
                   </p>
                 </div>
 
                 <div>
                   <p className="text-sm text-gray-600">Skills</p>
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {user.profile.skills.length > 0 ? (
-                      user.profile.skills.map((skill) => (
+                    {skills.length > 0 ? (
+                      skills.map((skill) => (
                         <span
                           key={skill}
                           className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
@@ -82,33 +104,82 @@ export default function Dashboard() {
                 </div>
 
                 <div>
-                  <p className="text-sm text-gray-600">Notice Period</p>
+                  <p className="text-sm text-gray-600">Languages</p>
                   <p className="text-lg font-medium text-gray-900">
-                    {user.profile.notice_period || 'Not provided'}
+                    {languages.length > 0 ? languages.join(', ') : 'Not provided'}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-gray-600">Current CTC</p>
+                  <p className="text-sm text-gray-600">Resume</p>
                   <p className="text-lg font-medium text-gray-900">
-                    {user.profile.current_ctc
-                      ? `₹${user.profile.current_ctc.toLocaleString()}`
-                      : 'Not provided'}
+                    {profile.resume_url || 'Not provided'}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-gray-600">Experience</p>
-                  <div className="mt-2 space-y-1">
-                    {Object.keys(user.profile.experience).length > 0 ? (
-                      Object.entries(user.profile.experience).map(([skill, years]) => (
-                        <p key={skill} className="text-sm text-gray-700">
-                          {skill}: {years} years
-                        </p>
-                      ))
-                    ) : (
-                      <span className="text-gray-500">No experience added</span>
-                    )}
+                  <p className="text-sm text-gray-600">Job Timeline</p>
+                  <p className="text-lg font-medium text-gray-900">
+                    {profile.job_search_timeline || 'Not provided'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">Work Experience</p>
+                  {workExperience.length > 0 ? (
+                    <div className="space-y-2">
+                      {workExperience.map((item, index) => (
+                        <div key={`${item.title || 'exp'}-${index}`} className="rounded border p-3">
+                          <p className="font-medium text-gray-900">{item.title || 'Untitled role'}</p>
+                          <p className="text-sm text-gray-600">{item.company || 'Unknown company'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500">No work experience added</p>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">Education</p>
+                  {education.length > 0 ? (
+                    <div className="space-y-2">
+                      {education.map((item, index) => (
+                        <div key={`${item.school || 'edu'}-${index}`} className="rounded border p-3">
+                          <p className="font-medium text-gray-900">{item.school || 'Unknown school'}</p>
+                          <p className="text-sm text-gray-600">{item.degree || 'Degree not provided'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500">No education added</p>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">Projects</p>
+                  {projects.length > 0 ? (
+                    <div className="space-y-2">
+                      {projects.map((item, index) => (
+                        <div key={`${item.name || 'project'}-${index}`} className="rounded border p-3">
+                          <p className="font-medium text-gray-900">{item.name || 'Untitled project'}</p>
+                          <p className="text-sm text-gray-600">{item.role || 'Role not provided'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500">No projects added</p>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">Links</p>
+                  <div className="space-y-1 text-sm text-gray-700">
+                    <p>LinkedIn: {links.linkedin || 'Not provided'}</p>
+                    <p>GitHub: {links.github || 'Not provided'}</p>
+                    <p>Portfolio: {links.portfolio || 'Not provided'}</p>
                   </div>
                 </div>
               </div>

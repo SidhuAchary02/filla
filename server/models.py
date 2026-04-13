@@ -19,23 +19,68 @@ class AuthResponse(BaseModel):
 
 # ============ ONBOARDING MODELS ============
 
+class LocationModel(BaseModel):
+    country: Optional[str] = None
+    state: Optional[str] = None
+    city: Optional[str] = None
+    pincode: Optional[str] = None
+
+class WorkExperienceModel(BaseModel):
+    title: str
+    company: str
+    location: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    is_current: bool = False
+    description: Optional[str] = None
+
+class EducationModel(BaseModel):
+    school: str
+    degree: str
+    major: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+
+class ProjectModel(BaseModel):
+    name: str
+    role: Optional[str] = None
+    description: Optional[str] = None
+    link: Optional[str] = None
+
+class LinksModel(BaseModel):
+    linkedin: Optional[str] = None
+    github: Optional[str] = None
+    portfolio: Optional[str] = None
+
 class OnboardingRequest(BaseModel):
-    full_name: str = Field(..., min_length=1, max_length=255)
-    phone: Optional[str] = Field(None, max_length=20)
-    skills: List[str] = Field(default=[], description="e.g. ['Python', 'React', 'FastAPI']")
-    experience: Dict[str, int] = Field(default={}, description="e.g. {'Python': 3, 'React': 2}")
-    notice_period: Optional[str] = Field(None, description="e.g. 'immediate', '1 month', '2 months'")
-    current_ctc: Optional[float] = Field(None, description="Current cost to company in currency units")
+    job_search_timeline: Optional[str] = None
+    location: Optional[LocationModel] = None
+    resume_url: Optional[str] = None
+    experience_level: Optional[str] = None
+    role: Optional[str] = None
+    work_experience: List[WorkExperienceModel] = Field(default=[])
+    education: List[EducationModel] = Field(default=[])
+    projects: List[ProjectModel] = Field(default=[])
+    links: Optional[LinksModel] = None
+    skills: List[str] = Field(default=[])
+    languages: List[str] = Field(default=[])
+    min_salary: Optional[float] = None
 
 class OnboardingResponse(BaseModel):
     id: str
     user_id: str
-    full_name: str
-    phone: Optional[str]
+    job_search_timeline: Optional[str]
+    location: Optional[dict]
+    resume_url: Optional[str]
+    experience_level: Optional[str]
+    role: Optional[str]
+    work_experience: List[dict]
+    education: List[dict]
+    projects: List[dict]
+    links: Optional[dict]
     skills: List[str]
-    experience: Dict[str, int]
-    notice_period: Optional[str]
-    current_ctc: Optional[float]
+    languages: List[str]
+    min_salary: Optional[float]
     onboarding_completed: bool
     created_at: datetime
     updated_at: datetime
@@ -45,12 +90,18 @@ class OnboardingResponse(BaseModel):
 class UserProfileResponse(BaseModel):
     id: str
     user_id: str
-    full_name: Optional[str]
-    phone: Optional[str]
+    job_search_timeline: Optional[str]
+    location: Optional[dict]
+    resume_url: Optional[str]
+    experience_level: Optional[str]
+    role: Optional[str]
+    work_experience: List[dict]
+    education: List[dict]
+    projects: List[dict]
+    links: Optional[dict]
     skills: List[str]
-    experience: Dict[str, int]
-    notice_period: Optional[str]
-    current_ctc: Optional[float]
+    languages: List[str]
+    min_salary: Optional[float]
     onboarding_completed: bool
     created_at: datetime
     updated_at: datetime

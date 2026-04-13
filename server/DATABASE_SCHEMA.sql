@@ -7,17 +7,39 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
   
-  -- Basic Info
-  full_name varchar(255),
-  phone varchar(20),
+  -- Job Search
+  job_search_timeline varchar(50), -- "ASAP", "within_3_months", "within_6_months", "passive"
   
-  -- Skills & Experience (flexible JSONB)
+  -- Location (jsonb)
+  location jsonb DEFAULT 'null'::jsonb, -- {"country": "...", "state": "...", "city": "...", "pincode": "..."}
+  
+  -- Resume
+  resume_url varchar(500),
+  
+  -- Experience Level
+  experience_level varchar(50), -- "internship", "entry", "junior", "mid", "senior", "expert"
+  
+  -- Role Preference
+  role varchar(255),
+  
+  -- Work Experience (array of objects)
+  work_experience jsonb DEFAULT '[]'::jsonb, -- [{"title": "...", "company": "...", "location": "...", "start_date": "...", "end_date": "...", "is_current": false, "description": "..."}]
+  
+  -- Education (array of objects)
+  education jsonb DEFAULT '[]'::jsonb, -- [{"school": "...", "degree": "...", "major": "...", "start_date": "...", "end_date": "..."}]
+  
+  -- Projects (array of objects)
+  projects jsonb DEFAULT '[]'::jsonb, -- [{"name": "...", "role": "...", "description": "...", "link": "..."}]
+  
+  -- Social & Portfolio Links
+  links jsonb DEFAULT 'null'::jsonb, -- {"linkedin": "...", "github": "...", "portfolio": "..."}
+  
+  -- Skills & Languages
   skills jsonb DEFAULT '[]'::jsonb, -- ["Python", "React", "FastAPI"]
-  experience jsonb DEFAULT '{}'::jsonb, -- {"Python": 3, "React": 2, "FastAPI": 1}
+  languages jsonb DEFAULT '[]'::jsonb, -- ["English", "Spanish"]
   
-  -- Employment Info
-  notice_period varchar(100), -- "immediate", "1 month", "2 months", etc.
-  current_ctc decimal(12, 2), -- Current cost to company
+  -- Salary Expectation
+  min_salary decimal(12, 2),
   
   -- Metadata
   onboarding_completed boolean DEFAULT false,
@@ -25,31 +47,82 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   updated_at timestamp with time zone DEFAULT now()
 );
 
--- 2. Create indexes for faster queries
-CREATE INDEX idx_user_profiles_user_id ON user_profiles(user_id);
-CREATE INDEX idx_user_profiles_created_at ON user_profiles(created_at);
+-- 2. Migration for existing tables (important: runs when table already exists)
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS job_search_timeline varchar(50);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS location jsonb DEFAULT 'null'::jsonb;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS resume_url varchar(500);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS experience_level varchar(50);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS role varchar(255);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS work_experience jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS education jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS projects jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS links jsonb DEFAULT 'null'::jsonb;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS skills jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS languages jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS min_salary decimal(12, 2);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS onboarding_completed boolean DEFAULT false;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS created_at timestamp with time zone DEFAULT now();
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone DEFAULT now();
 
--- 3. Enable RLS (Row Level Security)
+-- 3. Create indexes for faster queries
+CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON user_profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_profiles_created_at ON user_profiles(created_at);
+CREATE INDEX IF NOT EXISTS idx_user_profiles_onboarding_completed ON user_profiles(onboarding_completed);
+
+-- 4. Enable RLS (Row Level Security)
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 
--- 4. RLS Policies
+-- 5. RLS Policies
 -- Allow users to view their own profile
-CREATE POLICY "Users can view their own profile"
-  ON user_profiles FOR SELECT
-  USING (auth.uid() = user_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'user_profiles'
+      AND policyname = 'Users can view their own profile'
+  ) THEN
+    CREATE POLICY "Users can view their own profile"
+      ON user_profiles FOR SELECT
+      USING (auth.uid() = user_id);
+  END IF;
+END $$;
 
 -- Allow users to insert their own profile
-CREATE POLICY "Users can create their own profile"
-  ON user_profiles FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'user_profiles'
+      AND policyname = 'Users can create their own profile'
+  ) THEN
+    CREATE POLICY "Users can create their own profile"
+      ON user_profiles FOR INSERT
+      WITH CHECK (auth.uid() = user_id);
+  END IF;
+END $$;
 
 -- Allow users to update their own profile
-CREATE POLICY "Users can update their own profile"
-  ON user_profiles FOR UPDATE
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'user_profiles'
+      AND policyname = 'Users can update their own profile'
+  ) THEN
+    CREATE POLICY "Users can update their own profile"
+      ON user_profiles FOR UPDATE
+      USING (auth.uid() = user_id)
+      WITH CHECK (auth.uid() = user_id);
+  END IF;
+END $$;
 
--- 5. Create updated_at trigger
+-- 6. Create updated_at trigger
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -58,12 +131,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER update_user_profiles_updated_at
-  BEFORE UPDATE ON user_profiles
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at();
-
--- Seed with example (optional - for testing)
--- INSERT INTO user_profiles (user_id, full_name, phone) 
--- VALUES ('user-uuid-here', 'John Doe', '+1234567890') 
--- RETURNING *;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_trigger
+    WHERE tgname = 'update_user_profiles_updated_at'
+  ) THEN
+    CREATE TRIGGER update_user_profiles_updated_at
+      BEFORE UPDATE ON user_profiles
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at();
+  END IF;
+END $$;

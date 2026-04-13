@@ -5,6 +5,41 @@ import json
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
+
+def ensure_profile_exists(user_id: str):
+    response = supabase_client.table("user_profiles").select("*").eq("user_id", user_id).limit(1).execute()
+    if response.data and len(response.data) > 0:
+        return response.data[0]
+
+    insert_response = supabase_client.table("user_profiles").insert({
+        "user_id": user_id,
+        "job_search_timeline": None,
+        "location": None,
+        "resume_url": None,
+        "experience_level": None,
+        "role": None,
+        "work_experience": [],
+        "education": [],
+        "projects": [],
+        "links": None,
+        "skills": [],
+        "languages": [],
+        "min_salary": None,
+        "onboarding_completed": False,
+    }).execute()
+
+    if insert_response.data and len(insert_response.data) > 0:
+        return insert_response.data[0]
+
+    response = supabase_client.table("user_profiles").select("*").eq("user_id", user_id).limit(1).execute()
+    if response.data and len(response.data) > 0:
+        return response.data[0]
+
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Failed to initialize user profile"
+    )
+
 # ============ SIGNUP ============
 @router.post("/signup", response_model=AuthResponse)
 async def signup(request: SignupRequest):
@@ -43,12 +78,18 @@ async def signup(request: SignupRequest):
         try:
             supabase_client.table("user_profiles").insert({
                 "user_id": response.user.id,
-                "full_name": "",
-                "phone": None,
+                "job_search_timeline": None,
+                "location": None,
+                "resume_url": None,
+                "experience_level": None,
+                "role": None,
+                "work_experience": [],
+                "education": [],
+                "projects": [],
+                "links": None,
                 "skills": [],
-                "experience": {},
-                "notice_period": None,
-                "current_ctc": None,
+                "languages": [],
+                "min_salary": None,
                 "onboarding_completed": False
             }).execute()
         except Exception as e:
@@ -119,31 +160,32 @@ async def get_current_user(authorization: str = Header(None)):
         # Verify token with Supabase
         user = supabase_client.auth.get_user(token)
         
-        if not user:
+        if not user or not user.user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token"
             )
         
-        # Fetch profile
-        profile_response = supabase_client.table("user_profiles").select("*").eq("user_id", user.user.id).execute()
-        
-        profile = None
-        if profile_response.data and len(profile_response.data) > 0:
-            profile_data = profile_response.data[0]
-            profile = UserProfileResponse(
-                id=profile_data["id"],
-                user_id=profile_data["user_id"],
-                full_name=profile_data["full_name"],
-                phone=profile_data["phone"],
-                skills=profile_data["skills"] or [],
-                experience=profile_data["experience"] or {},
-                notice_period=profile_data["notice_period"],
-                current_ctc=profile_data["current_ctc"],
-                onboarding_completed=profile_data["onboarding_completed"],
-                created_at=profile_data["created_at"],
-                updated_at=profile_data["updated_at"]
-            )
+        profile_data = ensure_profile_exists(user.user.id)
+        profile = UserProfileResponse(
+            id=profile_data["id"],
+            user_id=profile_data["user_id"],
+            job_search_timeline=profile_data.get("job_search_timeline"),
+            location=profile_data.get("location"),
+            resume_url=profile_data.get("resume_url"),
+            experience_level=profile_data.get("experience_level"),
+            role=profile_data.get("role"),
+            work_experience=profile_data.get("work_experience") or [],
+            education=profile_data.get("education") or [],
+            projects=profile_data.get("projects") or [],
+            links=profile_data.get("links"),
+            skills=profile_data.get("skills") or [],
+            languages=profile_data.get("languages") or [],
+            min_salary=profile_data.get("min_salary"),
+            onboarding_completed=profile_data.get("onboarding_completed", False),
+            created_at=profile_data["created_at"],
+            updated_at=profile_data["updated_at"],
+        )
         
         return CurrentUserResponse(
             id=user.user.id,
@@ -152,10 +194,12 @@ async def get_current_user(authorization: str = Header(None)):
             profile=profile
         )
     
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
+            detail=f"Invalid token: {str(e)}"
         )
 
 # ============ LOGOUT ============

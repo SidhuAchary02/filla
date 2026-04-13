@@ -1,385 +1,654 @@
 import { useState, useEffect } from 'react'
-import { submitOnboarding, getUserProfile, getOnboardingStatus } from '../lib/authService'
+import { submitOnboarding, getUserProfile } from '../lib/authService'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/useAuth'
 
-export default function OnboardingForm() {
-  const { user, loading, getToken, isAuthenticated } = useAuth()
-  const navigate = useNavigate()
+const STEPS = [
+  { id: 1, title: 'Job Timeline' },
+  { id: 2, title: 'Location' },
+  { id: 3, title: 'Resume' },
+  { id: 4, title: 'Experience Level' },
+  { id: 5, title: 'Role Preference' },
+  { id: 6, title: 'Work Experience' },
+  { id: 7, title: 'Education' },
+  { id: 8, title: 'Projects' },
+  { id: 9, title: 'Links' },
+  { id: 10, title: 'Skills' },
+  { id: 11, title: 'Languages' },
+  { id: 12, title: 'Salary Expectation' },
+]
 
-  // Form state
+export default function OnboardingForm() {
+  const { loading, getToken, isAuthenticated } = useAuth()
+  const navigate = useNavigate()
+  const [currentStep, setCurrentStep] = useState(1)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  // Location data states
+  const [countries, setCountries] = useState([])
+  const [states, setStates] = useState([])
+  const [cities, setCities] = useState([])
+  const [pincodes, setPincodes] = useState([])
+  const [loadingCountries, setLoadingCountries] = useState(true)
+  const [loadingStates, setLoadingStates] = useState(false)
+  const [loadingCities, setLoadingCities] = useState(false)
+  const [loadingPincodes, setLoadingPincodes] = useState(false)
+
   const [formData, setFormData] = useState({
-    full_name: '',
-    phone: '',
+    job_search_timeline: '',
+    location: { country: '', state: '', city: '', pincode: '' },
+    resume_url: '',
+    experience_level: '',
+    role: '',
+    work_experience: [],
+    education: [],
+    projects: [],
+    links: { linkedin: '', github: '', portfolio: '' },
     skills: [],
-    experience: {},
-    notice_period: '',
-    current_ctc: '',
+    languages: [],
+    min_salary: '',
   })
 
-  const [skillInput, setSkillInput] = useState('')
-  const [experienceSkill, setExperienceSkill] = useState('')
-  const [experienceYears, setExperienceYears] = useState('')
-  const [loadingForm, setLoadingForm] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
+  const [tempWorkExp, setTempWorkExp] = useState({ title: '', company: '', location: '', start_date: '', end_date: '', is_current: false, description: '' })
+  const [tempEducation, setTempEducation] = useState({ school: '', degree: '', major: '', start_date: '', end_date: '' })
+  const [tempProject, setTempProject] = useState({ name: '', role: '', description: '', link: '' })
+  const [tempSkill, setTempSkill] = useState('')
+  const [tempLanguage, setTempLanguage] = useState('')
 
-  // Redirect if not authenticated (but only after loading finishes)
+  // Fetch countries on component mount
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      navigate('/login')
+    fetchCountries()
+  }, [])
+
+  // Fetch states when country changes
+  useEffect(() => {
+    if (formData.location.country) {
+      fetchStates(formData.location.country)
+      setCities([])
+      setPincodes([])
+      setFormData(prev => ({ ...prev, location: { ...prev.location, state: '', city: '', pincode: '' } }))
     }
+  }, [formData.location.country])
+
+  // Fetch cities when state changes
+  useEffect(() => {
+    if (formData.location.state && formData.location.country) {
+      fetchCities(formData.location.country, formData.location.state)
+      setPincodes([])
+      setFormData(prev => ({ ...prev, location: { ...prev.location, city: '', pincode: '' } }))
+    }
+  }, [formData.location.state])
+
+  // Fetch pincodes when city changes
+  useEffect(() => {
+    if (formData.location.city && formData.location.country) {
+      fetchPincodes(formData.location.country, formData.location.state, formData.location.city)
+    }
+  }, [formData.location.city])
+
+  const fetchCountries = async () => {
+    try {
+      setLoadingCountries(true)
+      const response = await fetch('https://restcountries.com/v3.1/all?fields=name,cca2')
+      const data = await response.json()
+      if (Array.isArray(data)) {
+        const countryList = data.map(country => ({
+          name: country?.name?.common,
+          code: country?.cca2,
+        })).sort((a, b) => a.name.localeCompare(b.name))
+        setCountries(countryList)
+      } else {
+        setCountries([])
+      }
+    } catch (err) {
+      console.error('Failed to fetch countries:', err)
+      setCountries([])
+    } finally {
+      setLoadingCountries(false)
+    }
+  }
+
+  const fetchStates = async (countryName) => {
+    try {
+      setLoadingStates(true)
+      const response = await fetch('https://countriesnow.space/api/v0.1/countries/states', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ country: countryName }),
+      })
+      const data = await response.json()
+      if (Array.isArray(data?.data?.states)) {
+        const stateList = data.data.states.map(state => ({
+          name: state.name,
+          code: state.name,
+        })).sort((a, b) => a.name.localeCompare(b.name))
+        setStates(stateList)
+      } else {
+        setStates([])
+      }
+    } catch (err) {
+      console.error('Failed to fetch states:', err)
+      setStates([])
+    } finally {
+      setLoadingStates(false)
+    }
+  }
+
+  const fetchCities = async (countryName, stateName) => {
+    try {
+      setLoadingCities(true)
+      const response = await fetch('https://countriesnow.space/api/v0.1/countries/state/cities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ country: countryName, state: stateName }),
+      })
+      const data = await response.json()
+      if (Array.isArray(data?.data)) {
+        const cityList = data.data.map((city, index) => ({
+          name: city,
+          geonameId: `${city}-${index}`,
+        })).sort((a, b) => a.name.localeCompare(b.name))
+        setCities(cityList)
+      } else {
+        setCities([])
+      }
+    } catch (err) {
+      console.error('Failed to fetch cities:', err)
+      setCities([])
+    } finally {
+      setLoadingCities(false)
+    }
+  }
+
+  const fetchPincodes = async (countryName, stateName, cityName) => {
+    try {
+      setLoadingPincodes(true)
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?city=${encodeURIComponent(cityName)}&state=${encodeURIComponent(stateName)}&country=${encodeURIComponent(countryName)}&format=jsonv2&addressdetails=1&limit=25`)
+      const data = await response.json()
+      if (Array.isArray(data)) {
+        const seen = new Set()
+        const pincodeList = data
+          .map(item => ({
+            code: item?.address?.postcode,
+            name: item?.display_name || cityName,
+          }))
+          .filter(item => item.code && !seen.has(item.code) && seen.add(item.code))
+          .sort((a, b) => a.code.localeCompare(b.code))
+        setPincodes(pincodeList)
+      } else {
+        setPincodes([])
+      }
+    } catch (err) {
+      console.error('Failed to fetch pincodes:', err)
+      setPincodes([])
+    } finally {
+      setLoadingPincodes(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!loading && !isAuthenticated) navigate('/login')
   }, [loading, isAuthenticated, navigate])
 
-  // Redirect if onboarding is already completed
   useEffect(() => {
     if (isAuthenticated && !loading) {
-      const isOnboardingComplete = localStorage.getItem('onboarding_complete') === 'true'
-      if (isOnboardingComplete) {
-        navigate('/dashboard')
-      }
+      const isComplete = localStorage.getItem('onboarding_complete') === 'true'
+      if (isComplete) navigate('/dashboard')
+      else fetchProfile()
     }
   }, [isAuthenticated, loading, navigate])
 
-  // Fetch existing profile data if available
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const token = getToken()
-        if (token) {
-          const profile = await getUserProfile(token)
-          setFormData({
-            full_name: profile.full_name || '',
-            phone: profile.phone || '',
-            skills: profile.skills || [],
-            experience: profile.experience || {},
-            notice_period: profile.notice_period || '',
-            current_ctc: profile.current_ctc || '',
-          })
-        }
-      } catch (err) {
-        console.error('Failed to fetch profile:', err)
-      }
-    }
-
-    if (isAuthenticated) {
-      fetchProfile()
-    }
-  }, [isAuthenticated, getToken])
-
-  // Handle basic input changes
-  const handleInputChange = (e) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
-  }
-
-  // Add skill to list
-  const addSkill = () => {
-    if (skillInput.trim() && !formData.skills.includes(skillInput.trim())) {
-      setFormData((prev) => ({
-        ...prev,
-        skills: [...prev.skills, skillInput.trim()],
-      }))
-      setSkillInput('')
-    }
-  }
-
-  // Remove skill from list
-  const removeSkill = (skillToRemove) => {
-    setFormData((prev) => ({
-      ...prev,
-      skills: prev.skills.filter((skill) => skill !== skillToRemove),
-      experience: (() => {
-        const newExp = { ...prev.experience }
-        delete newExp[skillToRemove]
-        return newExp
-      })(),
-    }))
-  }
-
-  // Add experience entry
-  const addExperience = () => {
-    if (experienceSkill.trim() && experienceYears) {
-      setFormData((prev) => ({
-        ...prev,
-        experience: {
-          ...prev.experience,
-          [experienceSkill.trim()]: parseInt(experienceYears, 10),
-        },
-      }))
-      setExperienceSkill('')
-      setExperienceYears('')
-    }
-  }
-
-  // Remove experience entry
-  const removeExperience = (skillKey) => {
-    setFormData((prev) => {
-      const newExp = { ...prev.experience }
-      delete newExp[skillKey]
-      return {
-        ...prev,
-        experience: newExp,
-      }
-    })
-  }
-
-  // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-    setSuccess(false)
-
-    // Validation
-    if (!formData.full_name.trim()) {
-      setError('Full name is required')
-      return
-    }
-
-    setLoadingForm(true)
-
+  const fetchProfile = async () => {
     try {
       const token = getToken()
-      if (!token) {
-        setError('Not authenticated')
-        navigate('/login')
-        return
+      if (token) {
+        const profile = await getUserProfile(token)
+        if (profile?.onboarding_completed) {
+          navigate('/dashboard')
+        } else if (profile) {
+          setFormData(prev => ({
+            ...prev,
+            job_search_timeline: profile.job_search_timeline || '',
+            location: profile.location || { country: '', state: '', city: '', pincode: '' },
+            resume_url: profile.resume_url || '',
+            experience_level: profile.experience_level || '',
+            role: profile.role || '',
+            work_experience: profile.work_experience || [],
+            education: profile.education || [],
+            projects: profile.projects || [],
+            links: profile.links || { linkedin: '', github: '', portfolio: '' },
+            skills: profile.skills || [],
+            languages: profile.languages || [],
+            min_salary: profile.min_salary || '',
+          }))
+        }
       }
-
-      await submitOnboarding(formData, token)
-      setSuccess(true)
-
-      // Mark onboarding as complete in localStorage
-      localStorage.setItem('onboarding_complete', 'true')
-
-      // Redirect after success
-      setTimeout(() => {
-        navigate('/dashboard')
-      }, 2000)
     } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoadingForm(false)
+      console.error('Failed to fetch profile:', err)
     }
   }
 
-  if (loading) {
-    return <div>Loading...</div>
+  const handleNext = () => {
+    if (currentStep < STEPS.length) {
+      setCurrentStep(currentStep + 1)
+      setError('')
+    }
   }
 
-  if (!isAuthenticated) {
-    return <div>Redirecting...</div>
+  const handlePrev = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1)
+      setError('')
+    }
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-8">
-        <div className="mb-8">
-          <h2 className="text-3xl font-extrabold text-gray-900">Complete Your Profile</h2>
-          <p className="mt-2 text-gray-600">Help us get to know you better</p>
-        </div>
+  const addWorkExp = () => {
+    if (tempWorkExp.title && tempWorkExp.company) {
+      setFormData(prev => ({
+        ...prev,
+        work_experience: [...prev.work_experience, tempWorkExp]
+      }))
+      setTempWorkExp({ title: '', company: '', location: '', start_date: '', end_date: '', is_current: false, description: '' })
+    }
+  }
 
-        {error && (
-          <div className="mb-4 rounded-md bg-red-50 p-4">
-            <p className="text-sm font-medium text-red-800">{error}</p>
-          </div>
-        )}
+  const removeWorkExp = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      work_experience: prev.work_experience.filter((_, i) => i !== index)
+    }))
+  }
 
-        {success && (
-          <div className="mb-4 rounded-md bg-green-50 p-4">
-            <p className="text-sm font-medium text-green-800">
-              Profile updated successfully! Redirecting...
-            </p>
-          </div>
-        )}
+  const addEducation = () => {
+    if (tempEducation.school && tempEducation.degree) {
+      setFormData(prev => ({
+        ...prev,
+        education: [...prev.education, tempEducation]
+      }))
+      setTempEducation({ school: '', degree: '', major: '', start_date: '', end_date: '' })
+    }
+  }
 
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* FULL NAME */}
-          <div>
-            <label htmlFor="full_name" className="block text-sm font-medium text-gray-700">
-              Full Name *
-            </label>
-            <input
-              type="text"
-              id="full_name"
-              name="full_name"
-              value={formData.full_name}
-              onChange={handleInputChange}
-              required
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="John Doe"
-            />
-          </div>
+  const removeEducation = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      education: prev.education.filter((_, i) => i !== index)
+    }))
+  }
 
-          {/* PHONE */}
-          <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-              Phone Number
-            </label>
-            <input
-              type="tel"
-              id="phone"
-              name="phone"
-              value={formData.phone}
-              onChange={handleInputChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="+1 (555) 123-4567"
-            />
-          </div>
+  const addProject = () => {
+    if (tempProject.name) {
+      setFormData(prev => ({
+        ...prev,
+        projects: [...prev.projects, tempProject]
+      }))
+      setTempProject({ name: '', role: '', description: '', link: '' })
+    }
+  }
 
-          {/* SKILLS */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Skills
-            </label>
-            <div className="flex gap-2 mb-4">
-              <input
-                type="text"
-                value={skillInput}
-                onChange={(e) => setSkillInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addSkill())}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="e.g., Python"
-              />
-              <button
-                type="button"
-                onClick={addSkill}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Add
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {formData.skills.map((skill) => (
-                <span
-                  key={skill}
-                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-sm"
-                >
-                  {skill}
-                  <button
-                    type="button"
-                    onClick={() => removeSkill(skill)}
-                    className="text-blue-600 hover:text-blue-800 font-bold"
-                  >
-                    ×
-                  </button>
-                </span>
+  const removeProject = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      projects: prev.projects.filter((_, i) => i !== index)
+    }))
+  }
+
+  const addSkill = () => {
+    if (tempSkill.trim() && !formData.skills.includes(tempSkill.trim())) {
+      setFormData(prev => ({
+        ...prev,
+        skills: [...prev.skills, tempSkill.trim()]
+      }))
+      setTempSkill('')
+    }
+  }
+
+  const removeSkill = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      skills: prev.skills.filter((_, i) => i !== index)
+    }))
+  }
+
+  const addLanguage = () => {
+    if (tempLanguage.trim() && !formData.languages.includes(tempLanguage.trim())) {
+      setFormData(prev => ({
+        ...prev,
+        languages: [...prev.languages, tempLanguage.trim()]
+      }))
+      setTempLanguage('')
+    }
+  }
+
+  const removeLanguage = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      languages: prev.languages.filter((_, i) => i !== index)
+    }))
+  }
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true)
+    setError('')
+    try {
+      const token = getToken()
+      if (!token) throw new Error('No auth token')
+
+      const sanitizedPayload = {
+        ...formData,
+        resume_url: formData.resume_url?.trim() || null,
+        role: formData.role?.trim() || null,
+        min_salary:
+          formData.min_salary === '' || formData.min_salary === null
+            ? null
+            : Number(formData.min_salary),
+        location: {
+          country: formData.location.country || null,
+          state: formData.location.state || null,
+          city: formData.location.city || null,
+          pincode: formData.location.pincode?.trim() || null,
+        },
+      }
+      
+      await submitOnboarding(sanitizedPayload, token)
+      localStorage.setItem('onboarding_complete', 'true')
+      navigate('/dashboard')
+    } catch (err) {
+      setError(err.message || 'Failed to submit onboarding')
+      setIsSubmitting(false)
+    }
+  }
+
+  const renderStep = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <div className="space-y-4">
+            <h3 className="font-semibold">When are you ready for a new job?</h3>
+            <div className="space-y-2">
+              {['ASAP', 'within_3_months', 'within_6_months', 'passive'].map(option => (
+                <label key={option} className="flex items-center">
+                  <input type="radio" name="job_search_timeline" value={option} checked={formData.job_search_timeline === option} onChange={e => setFormData(prev => ({ ...prev, job_search_timeline: e.target.value }))} className="mr-2" />
+                  {option.replace(/_/g, ' ')}
+                </label>
               ))}
             </div>
           </div>
+        )
 
-          {/* EXPERIENCE */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Years of Experience (by skill)
-            </label>
-            <div className="flex gap-2 mb-4">
-              <input
-                type="text"
-                value={experienceSkill}
-                onChange={(e) => setExperienceSkill(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Skill name"
-              />
-              <input
-                type="number"
-                value={experienceYears}
-                onChange={(e) => setExperienceYears(e.target.value)}
-                className="w-20 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Years"
-                min="0"
-                max="60"
-              />
-              <button
-                type="button"
-                onClick={addExperience}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Add
-              </button>
+      case 2:
+        return (
+          <div className="space-y-4">
+            <h3 className="font-semibold">Where are you located?</h3>
+            
+            {/* Country */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+              <select value={formData.location.country} onChange={e => setFormData(prev => ({ ...prev, location: { ...prev.location, country: e.target.value } }))} className="w-full px-3 py-2 border rounded" disabled={loadingCountries}>
+                <option value="">Select Country</option>
+                {countries.map(country => (
+                  <option key={country.code} value={country.name}>{country.name}</option>
+                ))}
+              </select>
+              {loadingCountries && <p className="text-xs text-gray-500 mt-1">Loading countries...</p>}
             </div>
-            <div className="grid grid-cols-1 gap-2">
-              {Object.entries(formData.experience).map(([skill, years]) => (
-                <div
-                  key={skill}
-                  className="flex justify-between items-center p-3 bg-gray-50 rounded-md border border-gray-200"
-                >
-                  <span className="text-sm font-medium">
-                    {skill}: <span className="text-gray-600">{years} years</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeExperience(skill)}
-                    className="text-red-600 hover:text-red-800 font-bold"
-                  >
-                    ×
-                  </button>
+
+            {/* State */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">State/Province</label>
+              <select value={formData.location.state} onChange={e => setFormData(prev => ({ ...prev, location: { ...prev.location, state: e.target.value } }))} className="w-full px-3 py-2 border rounded" disabled={!formData.location.country || loadingStates}>
+                <option value="">Select State/Province</option>
+                {states.map(state => (
+                  <option key={state.code} value={state.code}>{state.name}</option>
+                ))}
+              </select>
+              {loadingStates && <p className="text-xs text-gray-500 mt-1">Loading states...</p>}
+              {!formData.location.country && <p className="text-xs text-gray-500 mt-1">Select a country first</p>}
+            </div>
+
+            {/* City */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+              <select value={formData.location.city} onChange={e => setFormData(prev => ({ ...prev, location: { ...prev.location, city: e.target.value } }))} className="w-full px-3 py-2 border rounded" disabled={!formData.location.state || loadingCities}>
+                <option value="">Select City</option>
+                {cities.map(city => (
+                  <option key={city.geonameId} value={city.name}>{city.name}</option>
+                ))}
+              </select>
+              {loadingCities && <p className="text-xs text-gray-500 mt-1">Loading cities...</p>}
+              {!formData.location.state && <p className="text-xs text-gray-500 mt-1">Select a state first</p>}
+            </div>
+
+            {/* Pin Code */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Pin/Postal Code (Optional)</label>
+              <select value={formData.location.pincode} onChange={e => setFormData(prev => ({ ...prev, location: { ...prev.location, pincode: e.target.value } }))} className="w-full px-3 py-2 border rounded" disabled={!formData.location.city || loadingPincodes}>
+                <option value="">Select or enter manually</option>
+                {pincodes.map(pc => (
+                  <option key={pc.code} value={pc.code}>{pc.code} - {pc.name}</option>
+                ))}
+              </select>
+              {loadingPincodes && <p className="text-xs text-gray-500 mt-1">Loading postal codes...</p>}
+              <input type="text" placeholder="Or enter manually" value={formData.location.pincode} onChange={e => setFormData(prev => ({ ...prev, location: { ...prev.location, pincode: e.target.value } }))} className="w-full px-3 py-2 border rounded mt-2" />
+            </div>
+          </div>
+        )
+
+      case 3:
+        return (
+          <div className="space-y-4">
+            <h3 className="font-semibold">Upload Resume (Optional)</h3>
+            <input type="text" placeholder="Resume URL" value={formData.resume_url} onChange={e => setFormData(prev => ({ ...prev, resume_url: e.target.value }))} className="w-full px-3 py-2 border rounded" />
+            <p className="text-sm text-gray-500">You can skip this step or provide a URL to your resume</p>
+          </div>
+        )
+
+      case 4:
+        return (
+          <div className="space-y-4">
+            <h3 className="font-semibold">What's your experience level?</h3>
+            <div className="space-y-2">
+              {['internship', 'entry', 'junior', 'mid', 'senior', 'expert'].map(level => (
+                <label key={level} className="flex items-center">
+                  <input type="radio" name="experience_level" value={level} checked={formData.experience_level === level} onChange={e => setFormData(prev => ({ ...prev, experience_level: e.target.value }))} className="mr-2" />
+                  {level.charAt(0).toUpperCase() + level.slice(1)}
+                </label>
+              ))}
+            </div>
+          </div>
+        )
+
+      case 5:
+        return (
+          <div className="space-y-4">
+            <h3 className="font-semibold">What role are you interested in?</h3>
+            <input type="text" placeholder="e.g., Full-Stack Developer, Product Manager" value={formData.role} onChange={e => setFormData(prev => ({ ...prev, role: e.target.value }))} className="w-full px-3 py-2 border rounded" />
+          </div>
+        )
+
+      case 6:
+        return (
+          <div className="space-y-4">
+            <h3 className="font-semibold">Work Experience</h3>
+            <div className="border rounded p-3 space-y-2">
+              <input type="text" placeholder="Job Title" value={tempWorkExp.title} onChange={e => setTempWorkExp(prev => ({ ...prev, title: e.target.value }))} className="w-full px-3 py-2 border rounded text-sm" />
+              <input type="text" placeholder="Company" value={tempWorkExp.company} onChange={e => setTempWorkExp(prev => ({ ...prev, company: e.target.value }))} className="w-full px-3 py-2 border rounded text-sm" />
+              <input type="text" placeholder="Location" value={tempWorkExp.location} onChange={e => setTempWorkExp(prev => ({ ...prev, location: e.target.value }))} className="w-full px-3 py-2 border rounded text-sm" />
+              <input type="date" value={tempWorkExp.start_date} onChange={e => setTempWorkExp(prev => ({ ...prev, start_date: e.target.value }))} className="w-full px-3 py-2 border rounded text-sm" placeholder="Start Date" />
+              <input type="date" value={tempWorkExp.end_date} onChange={e => setTempWorkExp(prev => ({ ...prev, end_date: e.target.value }))} className="w-full px-3 py-2 border rounded text-sm" placeholder="End Date" disabled={tempWorkExp.is_current} />
+              <label className="flex items-center text-sm">
+                <input type="checkbox" checked={tempWorkExp.is_current} onChange={e => setTempWorkExp(prev => ({ ...prev, is_current: e.target.checked, end_date: e.target.checked ? '' : prev.end_date }))} className="mr-2" />
+                Currently working here
+              </label>
+              <textarea placeholder="Description" value={tempWorkExp.description} onChange={e => setTempWorkExp(prev => ({ ...prev, description: e.target.value }))} className="w-full px-3 py-2 border rounded text-sm" rows="2" />
+              <button onClick={addWorkExp} className="w-full bg-blue-600 text-white py-1 rounded text-sm hover:bg-blue-700">Add Experience</button>
+            </div>
+            <div className="space-y-2">
+              {formData.work_experience.map((exp, idx) => (
+                <div key={idx} className="flex justify-between items-start border rounded p-2 text-sm">
+                  <div>
+                    <p className="font-medium">{exp.title} at {exp.company}</p>
+                    <p className="text-xs text-gray-600">{exp.start_date} {!exp.is_current && `to ${exp.end_date}`}</p>
+                  </div>
+                  <button onClick={() => removeWorkExp(idx)} className="text-red-600 hover:text-red-800">✕</button>
                 </div>
               ))}
             </div>
           </div>
+        )
 
-          {/* NOTICE PERIOD */}
-          <div>
-            <label htmlFor="notice_period" className="block text-sm font-medium text-gray-700">
-              Notice Period
-            </label>
-            <select
-              id="notice_period"
-              name="notice_period"
-              value={formData.notice_period}
-              onChange={handleInputChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">Select notice period</option>
-              <option value="immediate">Immediate</option>
-              <option value="1 week">1 Week</option>
-              <option value="2 weeks">2 Weeks</option>
-              <option value="1 month">1 Month</option>
-              <option value="2 months">2 Months</option>
-              <option value="3 months">3 Months</option>
-            </select>
+      case 7:
+        return (
+          <div className="space-y-4">
+            <h3 className="font-semibold">Education</h3>
+            <div className="border rounded p-3 space-y-2">
+              <input type="text" placeholder="School/University" value={tempEducation.school} onChange={e => setTempEducation(prev => ({ ...prev, school: e.target.value }))} className="w-full px-3 py-2 border rounded text-sm" />
+              <input type="text" placeholder="Degree" value={tempEducation.degree} onChange={e => setTempEducation(prev => ({ ...prev, degree: e.target.value }))} className="w-full px-3 py-2 border rounded text-sm" />
+              <input type="text" placeholder="Major/Field" value={tempEducation.major} onChange={e => setTempEducation(prev => ({ ...prev, major: e.target.value }))} className="w-full px-3 py-2 border rounded text-sm" />
+              <input type="date" value={tempEducation.start_date} onChange={e => setTempEducation(prev => ({ ...prev, start_date: e.target.value }))} className="w-full px-3 py-2 border rounded text-sm" />
+              <input type="date" value={tempEducation.end_date} onChange={e => setTempEducation(prev => ({ ...prev, end_date: e.target.value }))} className="w-full px-3 py-2 border rounded text-sm" />
+              <button onClick={addEducation} className="w-full bg-blue-600 text-white py-1 rounded text-sm hover:bg-blue-700">Add Education</button>
+            </div>
+            <div className="space-y-2">
+              {formData.education.map((edu, idx) => (
+                <div key={idx} className="flex justify-between items-start border rounded p-2 text-sm">
+                  <div>
+                    <p className="font-medium">{edu.degree} in {edu.major}</p>
+                    <p className="text-xs text-gray-600">{edu.school}</p>
+                  </div>
+                  <button onClick={() => removeEducation(idx)} className="text-red-600 hover:text-red-800">✕</button>
+                </div>
+              ))}
+            </div>
           </div>
+        )
 
-          {/* CURRENT CTC */}
-          <div>
-            <label htmlFor="current_ctc" className="block text-sm font-medium text-gray-700">
-              Current CTC (Cost to Company)
-            </label>
-            <input
-              type="number"
-              id="current_ctc"
-              name="current_ctc"
-              value={formData.current_ctc}
-              onChange={handleInputChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="e.g., 500000"
-              min="0"
-              step="10000"
-            />
+      case 8:
+        return (
+          <div className="space-y-4">
+            <h3 className="font-semibold">Projects</h3>
+            <div className="border rounded p-3 space-y-2">
+              <input type="text" placeholder="Project Name" value={tempProject.name} onChange={e => setTempProject(prev => ({ ...prev, name: e.target.value }))} className="w-full px-3 py-2 border rounded text-sm" />
+              <input type="text" placeholder="Your Role" value={tempProject.role} onChange={e => setTempProject(prev => ({ ...prev, role: e.target.value }))} className="w-full px-3 py-2 border rounded text-sm" />
+              <textarea placeholder="Description" value={tempProject.description} onChange={e => setTempProject(prev => ({ ...prev, description: e.target.value }))} className="w-full px-3 py-2 border rounded text-sm" rows="2" />
+              <input type="text" placeholder="Project Link" value={tempProject.link} onChange={e => setTempProject(prev => ({ ...prev, link: e.target.value }))} className="w-full px-3 py-2 border rounded text-sm" />
+              <button onClick={addProject} className="w-full bg-blue-600 text-white py-1 rounded text-sm hover:bg-blue-700">Add Project</button>
+            </div>
+            <div className="space-y-2">
+              {formData.projects.map((proj, idx) => (
+                <div key={idx} className="flex justify-between items-start border rounded p-2 text-sm">
+                  <div>
+                    <p className="font-medium">{proj.name}</p>
+                    <p className="text-xs text-gray-600">{proj.role}</p>
+                  </div>
+                  <button onClick={() => removeProject(idx)} className="text-red-600 hover:text-red-800">✕</button>
+                </div>
+              ))}
+            </div>
           </div>
+        )
 
-          {/* SUBMIT BUTTON */}
-          <div className="flex gap-4 pt-4">
-            <button
-              type="submit"
-              disabled={loadingForm}
-              className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 font-medium"
-            >
-              {loadingForm ? 'Saving...' : 'Save Profile'}
+      case 9:
+        return (
+          <div className="space-y-4">
+            <h3 className="font-semibold">Social & Portfolio Links</h3>
+            <input type="text" placeholder="LinkedIn URL" value={formData.links.linkedin} onChange={e => setFormData(prev => ({ ...prev, links: { ...prev.links, linkedin: e.target.value } }))} className="w-full px-3 py-2 border rounded" />
+            <input type="text" placeholder="GitHub URL" value={formData.links.github} onChange={e => setFormData(prev => ({ ...prev, links: { ...prev.links, github: e.target.value } }))} className="w-full px-3 py-2 border rounded" />
+            <input type="text" placeholder="Portfolio URL" value={formData.links.portfolio} onChange={e => setFormData(prev => ({ ...prev, links: { ...prev.links, portfolio: e.target.value } }))} className="w-full px-3 py-2 border rounded" />
+          </div>
+        )
+
+      case 10:
+        return (
+          <div className="space-y-4">
+            <h3 className="font-semibold">Technical Skills</h3>
+            <div className="flex gap-2">
+              <input type="text" placeholder="Add a skill (e.g., Python, React)" value={tempSkill} onChange={e => setTempSkill(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSkill()} className="flex-1 px-3 py-2 border rounded" />
+              <button onClick={addSkill} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Add</button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {formData.skills.map((skill, idx) => (
+                <div key={idx} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm flex items-center gap-2">
+                  {skill}
+                  <button onClick={() => removeSkill(idx)} className="text-blue-600 hover:text-blue-800">✕</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+
+      case 11:
+        return (
+          <div className="space-y-4">
+            <h3 className="font-semibold">Languages</h3>
+            <div className="flex gap-2">
+              <input type="text" placeholder="Add a language (e.g., English, Spanish)" value={tempLanguage} onChange={e => setTempLanguage(e.target.value)} onKeyDown={e => e.key === 'Enter' && addLanguage()} className="flex-1 px-3 py-2 border rounded" />
+              <button onClick={addLanguage} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Add</button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {formData.languages.map((lang, idx) => (
+                <div key={idx} className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm flex items-center gap-2">
+                  {lang}
+                  <button onClick={() => removeLanguage(idx)} className="text-green-600 hover:text-green-800">✕</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+
+      case 12:
+        return (
+          <div className="space-y-4">
+            <h3 className="font-semibold">Minimum Salary Expectation</h3>
+            <input type="number" placeholder="Enter minimum salary" value={formData.min_salary} onChange={e => setFormData(prev => ({ ...prev, min_salary: e.target.value }))} className="w-full px-3 py-2 border rounded" />
+            <p className="text-sm text-gray-500">Leave blank if you prefer not to specify</p>
+          </div>
+        )
+
+      default:
+        return null
+    }
+  }
+
+  if (loading) return <div className="flex justify-center items-center h-screen">Loading...</div>
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8 px-4">
+      <div className="max-w-2xl mx-auto">
+        {/* Progress Bar */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-2">
+            <h2 className="text-2xl font-bold">Onboarding</h2>
+            <span className="text-sm text-gray-600">Step {currentStep} of {STEPS.length}</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${(currentStep / STEPS.length) * 100}%` }}></div>
+          </div>
+        </div>
+
+        {/* Card */}
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h3 className="text-xl font-semibold mb-4">{STEPS[currentStep - 1].title}</h3>
+          {error && <div className="bg-red-100 text-red-800 p-3 rounded mb-4 text-sm">{error}</div>}
+          {renderStep()}
+        </div>
+
+        {/* Navigation Buttons */}
+        <div className="flex justify-between gap-4">
+          <button onClick={handlePrev} disabled={currentStep === 1} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+            Previous
+          </button>
+          {currentStep < STEPS.length ? (
+            <button onClick={handleNext} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              Next
             </button>
-            <button
-              type="button"
-              onClick={() => navigate('/dashboard')}
-              className="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 font-medium"
-            >
-              Skip for Now
+          ) : (
+            <button onClick={handleSubmit} disabled={isSubmitting} className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">
+              {isSubmitting ? 'Submitting...' : 'Complete Onboarding'}
             </button>
-          </div>
-        </form>
+          )}
+        </div>
       </div>
     </div>
   )
