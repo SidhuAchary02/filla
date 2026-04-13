@@ -1,7 +1,29 @@
 (() => {
   "use strict";
 
-  const VALID_INPUT_TYPES = new Set(["text", "email", "number"]);
+  // Initialize FieldMatcher for intelligent form autofill
+  let fieldMatcher = null;
+  
+  // Safe initialization with error handling
+  try {
+    if (typeof FieldMatcher !== 'undefined') {
+      fieldMatcher = new FieldMatcher();
+      console.log('[Filla] FieldMatcher initialized successfully');
+    } else {
+      console.warn('[Filla] FieldMatcher class not available, waiting...');
+      // Retry initialization after a delay
+      setTimeout(() => {
+        if (typeof FieldMatcher !== 'undefined' && !fieldMatcher) {
+          fieldMatcher = new FieldMatcher();
+          console.log('[Filla] FieldMatcher initialized on retry');
+        }
+      }, 1000);
+    }
+  } catch (err) {
+    console.error('[Filla] Error initializing FieldMatcher:', err);
+  }
+
+  const VALID_INPUT_TYPES = new Set(["text", "email", "number", "tel", "url", "date", "time"]);
   const IGNORED_INPUT_TYPES = new Set([
     "hidden",
     "submit",
@@ -9,11 +31,11 @@
     "reset",
     "radio",
     "checkbox",
-    "file",
     "image",
     "range",
     "color"
   ]);
+  const AUTOFILL_INPUT_TYPES = new Set(["file", "text", "email", "number", "tel", "url", "date", "time", "select", "textarea"]);
 
   const NOISE_WORDS = new Set([
     "select",
@@ -62,7 +84,17 @@
     const type = (field.getAttribute("type") || "text").toLowerCase();
     if (IGNORED_INPUT_TYPES.has(type)) return false;
 
-    return VALID_INPUT_TYPES.has(type);
+    return VALID_INPUT_TYPES.has(type) || type === "file";
+  }
+
+  function isAutofillCapable(field) {
+    if (!isMeaningfulField(field)) return false;
+    if (field.tagName === "TEXTAREA" || field.tagName === "SELECT") return true;
+    if (field.tagName === "INPUT") {
+      const type = (field.getAttribute("type") || "text").toLowerCase();
+      return AUTOFILL_INPUT_TYPES.has(type);
+    }
+    return false;
   }
 
   function isVisibleField(field) {
@@ -244,7 +276,9 @@
 
     const payload = {
       question: extractQuestion(field),
-      type: getFieldType(field)
+      type: getFieldType(field),
+      autofillCapable: isAutofillCapable(field),
+      fieldElement: field
     };
 
     if (isLikelySearchControl(field, payload.question)) return;
@@ -551,7 +585,91 @@
     }
   }
 
+  // ============ HANDLE MESSAGES FROM POPUP ============
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    try {
+      if (message.action === 'autofill' && message.profileData) {
+        if (!fieldMatcher) {
+          sendResponse({
+            success: false,
+            error: 'FieldMatcher not initialized on this page. Try refreshing.'
+          });
+          return true;
+        }
+        handleAutofillMessage(message.profileData, sendResponse);
+        return true; // Will respond asynchronously
+      }
+    } catch (err) {
+      console.error('[Filla] Message handler error:', err);
+      sendResponse({
+        success: false,
+        error: err.message
+      });
+    }
+  });
+
+  async function handleAutofillMessage(profileData, sendResponse) {
+    try {
+      console.log('[Filla] Starting autofill with profile data:', Object.keys(profileData));
+      
+      if (!fieldMatcher || typeof fieldMatcher.matchFormFields !== 'function') {
+        sendResponse({
+          success: false,
+          error: 'Field matcher not initialized. Try refreshing the page.'
+        });
+        return;
+      }
+
+      // Get matching fields using FieldMatcher
+      const matchedFields = fieldMatcher.matchFormFields(profileData);
+      console.log(`[Filla] Found ${matchedFields.length} matching fields`);
+
+      if (!matchedFields || matchedFields.length === 0) {
+        // Log all fields found for debugging
+        const allFields = document.querySelectorAll('input, textarea, select');
+        const fieldInfo = Array.from(allFields)
+          .slice(0, 10)
+          .map(el => `${el.getAttribute('name') || el.getAttribute('id') || el.tagName}[${el.getAttribute('type') || 'text'}]`)
+          .join(', ');
+        
+        console.warn(`[Filla] No matching fields found. Total fields on page: ${allFields.length}`);
+        console.warn(`[Filla] Sample fields: ${fieldInfo}`);
+        sendResponse({
+          success: false,
+          error: `No matching form fields. Found ${allFields.length} total fields but none matched your profile.`
+        });
+        return;
+      }
+
+      // Autofill the matched fields
+      fieldMatcher.autofillForm(matchedFields);
+
+      sendResponse({
+        success: true,
+        filledCount: matchedFields.length,
+        fields: matchedFields.map(f => ({
+          type: f.fieldType,
+          value: f.formattedValue
+        }))
+      });
+    } catch (error) {
+      console.error('[Filla] Autofill error:', error);
+      sendResponse({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
   function start() {
+    // Check if page has a supported form
+    const isSupported = window.Filla && window.Filla.isSupportedForm && window.Filla.isSupportedForm();
+
+    if (!isSupported) {
+      console.log("[Filla] Page skipped - not a supported form");
+      return;
+    }
+
     const detectedFields = [];
     const originalLog = console.log;
     let floatingUIReady = false;

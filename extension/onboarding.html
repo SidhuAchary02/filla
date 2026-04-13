@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Filla - Complete Your Profile</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+
+      font-family: system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      width: 100%;
+      max-width: 700px;
+      padding: 40px;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      margin-bottom: 10px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .header p {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .loader {
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .error {
+      background: #fee;
+      border: 1px solid #fcc;
+      color: #c33;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    }
+
+    #root {
+      min-height: 400px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="root"></div>
+  </div>
+
+  <script>
+    // Check if we're running on localhost (development)
+    const isDev = window.location.hostname === 'localhost' || 
+                  window.location.hostname === '127.0.0.1' ||
+                  window.location.protocol === 'file:';
+
+    if (isDev) {
+      // Development: Load from React dev server
+      const script = document.createElement('script');
+      script.src = 'http://localhost:3000/index.js';
+      script.onload = () => console.log('React app loaded');
+      script.onerror = () => {
+        const root = document.getElementById('root');
+        root.innerHTML = `
+          <div class="error">
+            <strong>Unable to load React app</strong>
+            <p>Make sure the React dev server is running:</p>
+            <p><code>cd frontend && npm start</code></p>
+          </div>
+        `;
+      };
+      document.body.appendChild(script);
+    } else {
+      // Production: Show loading state
+      const root = document.getElementById('root');
+      root.innerHTML = `
+        <div class="header">
+          <h1>Filla Onboarding</h1>
+          <p>Complete Your Profile</p>
+        </div>
+        <div class="loader">
+          <div class="spinner"></div>
+          <p>Loading...</p>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>

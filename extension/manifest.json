@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "filla",
+  "version": "1.0",
+  "description": "Smart form autofill with intelligent field detection",
+  "permissions": ["activeTab", "storage", "scripting", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Filla Autofill"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["extension-auth.js", "field-matcher.js", "content.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["onboarding.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
