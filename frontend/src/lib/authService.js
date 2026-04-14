@@ -1,7 +1,30 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const FOUR_DAYS_IN_MS = 4 * 24 * 60 * 60 * 1000
+
+function persistAuthSession(accessToken, userId, rememberMe = true) {
+  if (rememberMe) {
+    localStorage.setItem('auth_token', accessToken)
+    localStorage.setItem('user_id', userId)
+    sessionStorage.removeItem('auth_token')
+    sessionStorage.removeItem('user_id')
+  } else {
+    sessionStorage.setItem('auth_token', accessToken)
+    sessionStorage.setItem('user_id', userId)
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('user_id')
+    localStorage.removeItem('auth_expiry')
+  }
+
+  if (rememberMe) {
+    const expiry = Date.now() + FOUR_DAYS_IN_MS
+    localStorage.setItem('auth_expiry', expiry.toString())
+  } else {
+    localStorage.removeItem('auth_expiry')
+  }
+}
 
 // ============ SIGNUP ============
-export async function signup(email, password) {
+export async function signup(email, password, rememberMe = true) {
   try {
     const response = await fetch(`${API_URL}/auth/signup`, {
       method: 'POST',
@@ -18,9 +41,7 @@ export async function signup(email, password) {
 
     const data = await response.json()
     
-    // Store token in localStorage
-    localStorage.setItem('auth_token', data.access_token)
-    localStorage.setItem('user_id', data.user_id)
+    persistAuthSession(data.access_token, data.user_id, rememberMe)
     
     return data;
   } catch (error) {
@@ -30,7 +51,7 @@ export async function signup(email, password) {
 }
 
 // ============ LOGIN ============
-export async function login(email, password) {
+export async function login(email, password, rememberMe = true) {
   try {
     const response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
@@ -47,9 +68,7 @@ export async function login(email, password) {
 
     const data = await response.json()
     
-    // Store token in localStorage
-    localStorage.setItem('auth_token', data.access_token)
-    localStorage.setItem('user_id', data.user_id)
+    persistAuthSession(data.access_token, data.user_id, rememberMe)
     
     return data
   } catch (error) {
@@ -169,4 +188,7 @@ export async function getUserProfile(token) {
 export function logout() {
   localStorage.removeItem('auth_token')
   localStorage.removeItem('user_id')
+  localStorage.removeItem('auth_expiry')
+  sessionStorage.removeItem('auth_token')
+  sessionStorage.removeItem('user_id')
 }

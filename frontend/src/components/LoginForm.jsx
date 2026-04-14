@@ -6,6 +6,7 @@ import { useAuth } from '../lib/useAuth'
 export default function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
@@ -23,7 +24,7 @@ export default function LoginForm() {
     setLoading(true)
 
     try {
-      const response = await login(email, password)
+      const response = await login(email, password, rememberMe)
       
       // Fetch user data to update state
       const token = getToken()
@@ -106,6 +107,16 @@ export default function LoginForm() {
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </div>
+
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            Remember me 
+          </label>
         </form>
       </div>
     </div>
