@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 import auth
 import onboarding
+import languages
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -27,6 +28,7 @@ app.add_middleware(
 # ============ INCLUDE ROUTERS ============
 app.include_router(auth.router)
 app.include_router(onboarding.router)
+app.include_router(languages.router)
 
 # ============ HEALTH CHECK ============
 @app.get("/health")

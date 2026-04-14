@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { submitOnboarding, getUserProfile } from '../lib/authService'
 import { useAuth } from '../lib/useAuth'
+import { createSupabaseClientWithToken } from '../lib/supabaseClient'
+import { detectLocaleCurrency } from './SalaryInput'
 import JobTimelineStep from './onboarding/steps/JobTimelineStep'
 import LocationStep from './onboarding/steps/LocationStep'
 import ResumeStep from './onboarding/steps/ResumeStep'
@@ -30,6 +32,134 @@ const STEPS = [
   { id: 12, slug: 'salary-expectation', title: 'Salary Expectation', Component: SalaryExpectationStep },
 ]
 
+const RESUME_BUCKET = 'resumes'
+const ALLOWED_RESUME_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+])
+const ALLOWED_RESUME_EXTENSIONS = new Set(['pdf', 'doc', 'docx'])
+const normalizeSkillText = value => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ')
+
+const toSkillObject = skill => {
+  if (!skill) return null
+
+  if (typeof skill === 'string') {
+    const name = skill.trim()
+    if (!name) return null
+    return { name, normalized: normalizeSkillText(name) }
+  }
+
+  const name = String(skill.name || '').trim()
+  if (!name) return null
+
+  return {
+    name,
+    normalized: String(skill.normalized || normalizeSkillText(name)).trim().toLowerCase(),
+  }
+}
+
+const normalizeSkills = skills => {
+  if (!Array.isArray(skills)) return []
+  const seen = new Set()
+
+  return skills.reduce((accumulator, skill) => {
+    const normalizedSkill = toSkillObject(skill)
+    if (!normalizedSkill || seen.has(normalizedSkill.normalized)) return accumulator
+    seen.add(normalizedSkill.normalized)
+    accumulator.push(normalizedSkill)
+    return accumulator
+  }, [])
+}
+
+const normalizeLanguageText = value => String(value || '').trim().toLowerCase().replace(/\s+/g, '_')
+
+const toLanguageObject = language => {
+  if (!language) return null
+
+  if (typeof language === 'string') {
+    const name = language.trim()
+    if (!name) return null
+    return { name, normalized: normalizeLanguageText(name) }
+  }
+
+  const name = String(language.name || '').trim()
+  if (!name) return null
+
+  return {
+    name,
+    normalized: String(language.normalized || normalizeLanguageText(name)).trim().toLowerCase(),
+  }
+}
+
+const normalizeLanguages = languages => {
+  if (!Array.isArray(languages)) return []
+  const seen = new Set()
+
+  return languages.reduce((accumulator, language) => {
+    const normalizedLanguage = toLanguageObject(language)
+    if (!normalizedLanguage || seen.has(normalizedLanguage.normalized)) return accumulator
+    seen.add(normalizedLanguage.normalized)
+    accumulator.push(normalizedLanguage)
+    return accumulator
+  }, [])
+}
+
+const getFileExtension = name => (name?.split('.').pop() || '').toLowerCase()
+
+const sanitizeFileName = name => name.replace(/[^a-zA-Z0-9._-]/g, '_')
+
+const isAllowedResumeFile = file => {
+  if (!file) return false
+  if (ALLOWED_RESUME_MIME_TYPES.has(file.type)) return true
+  return ALLOWED_RESUME_EXTENSIONS.has(getFileExtension(file.name))
+}
+
+const isValidEmail = value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim())
+
+const ONBOARDING_DRAFT_KEY = 'onboarding_form_draft_v1'
+
+const getDefaultFormData = () => ({
+  job_search_timeline: '',
+  location: { country: '', state: '', city: '', pincode: '' },
+  resume_url: '',
+  resume_file: null,
+  experience_level: '',
+  role: '',
+  work_experience: [],
+  education: [],
+  projects: [],
+  links: { linkedin: '', github: '', portfolio: '' },
+  skills: [],
+  languages: [],
+  salary_expectation: {
+    amount: null,
+    currency: detectLocaleCurrency(),
+    period: 'yearly',
+  },
+})
+
+const getInitialFormData = () => {
+  const defaults = getDefaultFormData()
+  if (typeof window === 'undefined') return defaults
+
+  try {
+    const rawDraft = window.sessionStorage.getItem(ONBOARDING_DRAFT_KEY)
+    if (!rawDraft) return defaults
+
+    const draft = JSON.parse(rawDraft)
+    return {
+      ...defaults,
+      ...draft,
+      location: { ...defaults.location, ...(draft?.location || {}) },
+      links: { ...defaults.links, ...(draft?.links || {}) },
+      salary_expectation: { ...defaults.salary_expectation, ...(draft?.salary_expectation || {}) },
+    }
+  } catch {
+    return defaults
+  }
+}
+
 export default function OnboardingForm() {
   const { loading, getToken, isAuthenticated } = useAuth()
   const navigate = useNavigate()
@@ -47,37 +177,83 @@ export default function OnboardingForm() {
   const [loadingCities, setLoadingCities] = useState(false)
   const [loadingPincodes, setLoadingPincodes] = useState(false)
 
-  const [formData, setFormData] = useState({
-    job_search_timeline: '',
-    location: { country: '', state: '', city: '', pincode: '' },
-    resume_url: '',
-    experience_level: '',
-    role: '',
-    work_experience: [],
-    education: [],
-    projects: [],
-    links: { linkedin: '', github: '', portfolio: '' },
-    skills: [],
-    languages: [],
-    min_salary: '',
-  })
+  const [formData, setFormData] = useState(getInitialFormData)
 
   const [tempWorkExp, setTempWorkExp] = useState({ title: '', company: '', location: '', start_date: '', end_date: '', is_current: false, description: '' })
   const [tempEducation, setTempEducation] = useState({ school: '', degree: '', major: '', start_date: '', end_date: '' })
   const [tempProject, setTempProject] = useState({ name: '', role: '', description: '', link: '' })
-  const [tempSkill, setTempSkill] = useState('')
-  const [tempLanguage, setTempLanguage] = useState('')
 
   const currentStepIndex = STEPS.findIndex(step => step.slug === stepSlug)
   const isValidStep = currentStepIndex >= 0
   const safeStepIndex = isValidStep ? currentStepIndex : 0
   const currentStep = STEPS[safeStepIndex]
 
+  const validateCurrentStep = () => {
+    const stepSlug = currentStep?.slug
+
+    const fullName = (formData.fullName || formData.full_name || '').trim()
+    const email = (formData.email || '').trim()
+    const phone = (formData.phone || '').trim()
+    const hasBasicInfoFields = 'fullName' in formData || 'full_name' in formData || 'email' in formData || 'phone' in formData
+
+    if (stepSlug === 'basic-info' || (safeStepIndex === 0 && hasBasicInfoFields)) {
+      if (!fullName || !email || !phone) {
+        return 'Please fill all required fields'
+      }
+      if (!isValidEmail(email)) {
+        return 'Please enter a valid email address'
+      }
+    }
+
+    if (stepSlug === 'education') {
+      if (!Array.isArray(formData.education) || formData.education.length === 0) {
+        return 'Add at least 1 education to continue'
+      }
+    }
+
+    if (stepSlug === 'skills') {
+      if (!Array.isArray(formData.skills) || formData.skills.length === 0) {
+        return 'Add at least 1 skill to continue'
+      }
+    }
+
+    return ''
+  }
+
   useEffect(() => {
     if (!stepSlug || !isValidStep) {
       navigate(`/onboarding/${STEPS[0].slug}`, { replace: true })
     }
   }, [stepSlug, isValidStep, navigate])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const draftToPersist = {
+      ...formData,
+      resume_file: null,
+    }
+
+    window.sessionStorage.setItem(ONBOARDING_DRAFT_KEY, JSON.stringify(draftToPersist))
+  }, [formData])
+
+  useEffect(() => {
+    if (!error) return
+    const validationError = validateCurrentStep()
+    if (!validationError) {
+      setError('')
+    }
+  }, [
+    error,
+    safeStepIndex,
+    currentStep?.slug,
+    formData.fullName,
+    formData.full_name,
+    formData.email,
+    formData.phone,
+    formData.education,
+    formData.skills,
+  ])
 
   useEffect(() => {
     fetchCountries()
@@ -235,19 +411,35 @@ export default function OnboardingForm() {
           navigate('/dashboard')
         } else if (profile) {
           setFormData(prev => ({
+            ...getDefaultFormData(),
             ...prev,
-            job_search_timeline: profile.job_search_timeline || '',
-            location: profile.location || { country: '', state: '', city: '', pincode: '' },
-            resume_url: profile.resume_url || '',
-            experience_level: profile.experience_level || '',
-            role: profile.role || '',
-            work_experience: profile.work_experience || [],
-            education: profile.education || [],
-            projects: profile.projects || [],
-            links: profile.links || { linkedin: '', github: '', portfolio: '' },
-            skills: profile.skills || [],
-            languages: profile.languages || [],
-            min_salary: profile.min_salary || '',
+            job_search_timeline: prev.job_search_timeline || profile.job_search_timeline || '',
+            location: {
+              ...getDefaultFormData().location,
+              ...(profile.location || {}),
+              ...(prev.location || {}),
+            },
+            resume_url: prev.resume_url || profile.resume_url || '',
+            experience_level: prev.experience_level || profile.experience_level || '',
+            role: prev.role || profile.role || '',
+            work_experience: Array.isArray(prev.work_experience) && prev.work_experience.length > 0 ? prev.work_experience : (profile.work_experience || []),
+            education: Array.isArray(prev.education) && prev.education.length > 0 ? prev.education : (profile.education || []),
+            projects: Array.isArray(prev.projects) && prev.projects.length > 0 ? prev.projects : (profile.projects || []),
+            links: {
+              ...getDefaultFormData().links,
+              ...(profile.links || {}),
+              ...(prev.links || {}),
+            },
+            skills: Array.isArray(prev.skills) && prev.skills.length > 0 ? prev.skills : normalizeSkills(profile.skills),
+            languages: Array.isArray(prev.languages) && prev.languages.length > 0 ? prev.languages : normalizeLanguages(profile.languages),
+            salary_expectation: {
+              amount:
+                prev.salary_expectation?.amount !== null && prev.salary_expectation?.amount !== undefined
+                  ? prev.salary_expectation.amount
+                  : (typeof profile.min_salary === 'number' ? profile.min_salary : null),
+              currency: prev.salary_expectation?.currency || detectLocaleCurrency(),
+              period: prev.salary_expectation?.period || 'yearly',
+            },
           }))
         }
       }
@@ -257,6 +449,12 @@ export default function OnboardingForm() {
   }
 
   const handleNext = () => {
+    const validationError = validateCurrentStep()
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+
     if (safeStepIndex < STEPS.length - 1) {
       const nextStep = STEPS[safeStepIndex + 1]
       setError('')
@@ -323,40 +521,6 @@ export default function OnboardingForm() {
     }))
   }
 
-  const addSkill = () => {
-    if (tempSkill.trim() && !formData.skills.includes(tempSkill.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        skills: [...prev.skills, tempSkill.trim()],
-      }))
-      setTempSkill('')
-    }
-  }
-
-  const removeSkill = index => {
-    setFormData(prev => ({
-      ...prev,
-      skills: prev.skills.filter((_, i) => i !== index),
-    }))
-  }
-
-  const addLanguage = () => {
-    if (tempLanguage.trim() && !formData.languages.includes(tempLanguage.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        languages: [...prev.languages, tempLanguage.trim()],
-      }))
-      setTempLanguage('')
-    }
-  }
-
-  const removeLanguage = index => {
-    setFormData(prev => ({
-      ...prev,
-      languages: prev.languages.filter((_, i) => i !== index),
-    }))
-  }
-
   const handleSubmit = async () => {
     setIsSubmitting(true)
     setError('')
@@ -364,11 +528,49 @@ export default function OnboardingForm() {
       const token = getToken()
       if (!token) throw new Error('No auth token')
 
+      let resolvedResumePath = formData.resume_url?.trim() || null
+
+      if (formData.resume_file) {
+        const userId = localStorage.getItem('user_id')
+        if (!userId) {
+          throw new Error('Missing user id for resume upload')
+        }
+        if (!isAllowedResumeFile(formData.resume_file)) {
+          throw new Error('Only PDF, DOC, or DOCX files are allowed for resume upload')
+        }
+
+        const supabaseAuthedClient = createSupabaseClientWithToken(token)
+        const fileName = sanitizeFileName(formData.resume_file.name || 'resume')
+        const filePath = `${userId}/${Date.now()}-${fileName}`
+
+        const { error: uploadError } = await supabaseAuthedClient.storage
+          .from(RESUME_BUCKET)
+          .upload(filePath, formData.resume_file, {
+            cacheControl: '3600',
+            upsert: false,
+          })
+
+        if (uploadError) {
+          throw new Error(`Resume upload failed: ${uploadError.message}`)
+        }
+
+        resolvedResumePath = filePath
+      }
+
+      const formDataForApi = { ...formData }
+      delete formDataForApi.resume_file
+      delete formDataForApi.salary_expectation
+
+      const rawSalaryAmount = formData.salary_expectation?.amount
+      const salaryAmount = typeof rawSalaryAmount === 'number' && Number.isFinite(rawSalaryAmount) ? rawSalaryAmount : null
+
       const sanitizedPayload = {
-        ...formData,
-        resume_url: formData.resume_url?.trim() || null,
+        ...formDataForApi,
+        resume_url: resolvedResumePath,
         role: formData.role?.trim() || null,
-        min_salary: formData.min_salary === '' || formData.min_salary === null ? null : Number(formData.min_salary),
+        min_salary: salaryAmount,
+        skills: normalizeSkills(formData.skills).map(skill => skill.normalized),
+        languages: normalizeLanguages(formData.languages).map(language => language.normalized),
         location: {
           country: formData.location.country || null,
           state: formData.location.state || null,
@@ -433,14 +635,6 @@ export default function OnboardingForm() {
             setTempProject={setTempProject}
             addProject={addProject}
             removeProject={removeProject}
-            tempSkill={tempSkill}
-            setTempSkill={setTempSkill}
-            addSkill={addSkill}
-            removeSkill={removeSkill}
-            tempLanguage={tempLanguage}
-            setTempLanguage={setTempLanguage}
-            addLanguage={addLanguage}
-            removeLanguage={removeLanguage}
           />
         </div>
 

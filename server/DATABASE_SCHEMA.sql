@@ -144,3 +144,14 @@ BEGIN
       EXECUTE FUNCTION update_updated_at();
   END IF;
 END $$;
+
+-- 7. Languages lookup table for searchable select/create input
+CREATE TABLE IF NOT EXISTS languages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name varchar(255) NOT NULL,
+  normalized varchar(255) NOT NULL UNIQUE,
+  created_at timestamp with time zone DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_languages_normalized ON languages(normalized);
+CREATE INDEX IF NOT EXISTS idx_languages_name ON languages(name);
