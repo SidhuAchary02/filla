@@ -217,6 +217,14 @@ async def get_autofill_data(authorization: str = Header(None)):
             "location": profile.get("location") or {},
             "resume_url": profile.get("resume_url"),
             "min_salary": profile.get("min_salary"),
+            # Backward-compatible keys used by question mapping engine
+            "full_name": profile.get("full_name"),
+            "email": profile.get("email"),
+            "phone": profile.get("phone"),
+            "experience": profile.get("experience") or {},
+            "notice_period": profile.get("notice_period"),
+            "current_ctc": profile.get("current_ctc"),
+            "expected_ctc": profile.get("expected_ctc") or profile.get("min_salary"),
         }
 
         return {

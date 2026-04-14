@@ -620,18 +620,67 @@
         return;
       }
 
-      // Get matching fields using FieldMatcher
-      const matchedFields = fieldMatcher.matchFormFields(profileData);
-      console.log(`[Filla] Found ${matchedFields.length} matching fields`);
+      const matchedFields = fieldMatcher.matchFormFields(profileData) || [];
+      const filledElements = new WeakSet();
+      let filledCount = 0;
 
-      if (!matchedFields || matchedFields.length === 0) {
-        // Log all fields found for debugging
-        const allFields = document.querySelectorAll('input, textarea, select');
-        const fieldInfo = Array.from(allFields)
-          .slice(0, 10)
-          .map(el => `${el.getAttribute('name') || el.getAttribute('id') || el.tagName}[${el.getAttribute('type') || 'text'}]`)
+      if (matchedFields.length > 0) {
+        matchedFields.forEach(({ element, formattedValue }) => {
+          try {
+            if (element && formattedValue !== null && formattedValue !== undefined && String(formattedValue).trim() !== '') {
+              element.value = String(formattedValue);
+              element.dispatchEvent(new Event('input', { bubbles: true }));
+              element.dispatchEvent(new Event('change', { bubbles: true }));
+              filledElements.add(element);
+              filledCount += 1;
+            }
+          } catch (_err) {
+            // Continue best-effort filling.
+          }
+        });
+      }
+
+      // Fallback pass: question-based mapping for dynamic fields.
+      const allFields = Array.from(document.querySelectorAll('input, textarea, select'));
+      const handledRadioGroups = new Set();
+
+      allFields.forEach((field) => {
+        if (!isVisibleField(field) || !isAutofillCapable(field) || filledElements.has(field)) {
+          return;
+        }
+
+        const question = extractQuestion(field);
+        const mapped = resolveQuestionMapping(question, profileData);
+        if (!mapped || mapped.value === null || mapped.value === undefined || mapped.value === '') {
+          return;
+        }
+
+        const fieldType = getFieldType(field);
+        if (fieldType === 'radio') {
+          const radioName = field.getAttribute('name') || '';
+          if (!radioName || handledRadioGroups.has(radioName)) {
+            return;
+          }
+          const didFill = fillRadioGroupByQuestion(field, mapped.value);
+          if (didFill) {
+            handledRadioGroups.add(radioName);
+            filledCount += 1;
+          }
+          return;
+        }
+
+        const didFill = fillGenericField(field, mapped.value, fieldType);
+        if (didFill) {
+          filledCount += 1;
+        }
+      });
+
+      if (filledCount === 0) {
+        const fieldInfo = allFields
+          .slice(0, 12)
+          .map(el => `${extractQuestion(el)} [${getFieldType(el)}]`)
           .join(', ');
-        
+
         console.warn(`[Filla] No matching fields found. Total fields on page: ${allFields.length}`);
         console.warn(`[Filla] Sample fields: ${fieldInfo}`);
         sendResponse({
@@ -641,13 +690,10 @@
         return;
       }
 
-      // Autofill the matched fields
-      fieldMatcher.autofillForm(matchedFields);
-
       sendResponse({
         success: true,
-        filledCount: matchedFields.length,
-        fields: matchedFields.map(f => ({
+        filledCount,
+        fields: matchedFields.map((f) => ({
           type: f.fieldType,
           value: f.formattedValue
         }))
@@ -658,6 +704,105 @@
         success: false,
         error: error.message
       });
+    }
+  }
+
+  function resolveQuestionMapping(question, profileData) {
+    const q = normalizeText(question).toLowerCase();
+    const profile = profileData || {};
+
+    if (typeof window.mapToProfile === 'function') {
+      const mapped = window.mapToProfile(question, profile);
+      if (mapped && mapped.type !== 'unknown') {
+        return mapped;
+      }
+    }
+
+    // Education yes/no fallback for questions like:
+    // "Have you completed ... Associate's Degree?"
+    if (q.includes('education') || q.includes('degree')) {
+      const education = Array.isArray(profile.education) ? profile.education : [];
+      const degrees = education
+        .map((e) => normalizeText(e?.degree || e?.major || ''))
+        .join(' ')
+        .toLowerCase();
+
+      let required = '';
+      if (q.includes('associate')) required = 'associate';
+      else if (q.includes('bachelor')) required = 'bachelor';
+      else if (q.includes('master')) required = 'master';
+      else if (q.includes('phd') || q.includes('doctor')) required = 'phd';
+
+      if (required) {
+        const hasLevel = degrees.includes(required);
+        return { type: 'personal', key: 'education', value: hasLevel ? 'Yes' : 'No' };
+      }
+    }
+
+    // Generic years of experience fallback when no specific skill match is found.
+    if (q.includes('years') && q.includes('experience')) {
+      return { type: 'experience', key: null, value: 0 };
+    }
+
+    // Location yes/no fallback: "Are you currently based in Mumbai?"
+    if (q.includes('based in')) {
+      const location = profile.location || {};
+      const city = normalizeText(location.city || '').toLowerCase();
+      const match = q.match(/based in\s+([a-z .-]+)/i);
+      if (match && match[1]) {
+        const askedCity = normalizeText(match[1]).replace(/[?]/g, '').toLowerCase();
+        const isBased = city && (city.includes(askedCity) || askedCity.includes(city));
+        return { type: 'personal', key: 'location', value: isBased ? 'Yes' : 'No' };
+      }
+    }
+
+    return { type: 'unknown', key: null, value: null };
+  }
+
+  function fillRadioGroupByQuestion(field, value) {
+    const groupName = field.getAttribute('name');
+    if (!groupName) return false;
+
+    const radios = Array.from(document.querySelectorAll(`input[type="radio"][name="${CSS.escape(groupName)}"]`));
+    if (radios.length === 0) return false;
+
+    const target = normalizeText(String(value)).toLowerCase();
+    const picked = radios.find((radio) => {
+      const label = extractQuestion(radio).toLowerCase();
+      const radioVal = normalizeText(radio.value).toLowerCase();
+      return label.includes(target) || radioVal === target;
+    });
+
+    if (!picked) return false;
+
+    picked.checked = true;
+    picked.dispatchEvent(new Event('input', { bubbles: true }));
+    picked.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }
+
+  function fillGenericField(field, value, fieldType) {
+    try {
+      if (fieldType === 'select') {
+        const target = normalizeText(String(value)).toLowerCase();
+        const options = Array.from(field.options || []);
+        const match = options.find((opt) => {
+          const optValue = normalizeText(opt.value).toLowerCase();
+          const optText = normalizeText(opt.textContent).toLowerCase();
+          return optValue === target || optText === target || optText.includes(target);
+        });
+
+        if (!match) return false;
+        field.value = match.value;
+      } else {
+        field.value = String(value);
+      }
+
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      field.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    } catch (_err) {
+      return false;
     }
   }
 

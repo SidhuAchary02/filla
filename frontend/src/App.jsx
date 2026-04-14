@@ -23,6 +23,14 @@ function App() {
           }
         />
         <Route
+          path="/onboarding/:stepSlug"
+          element={
+            <ProtectedRoute>
+              <OnboardingForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/dashboard"
           element={
             <ProtectedRoute>
