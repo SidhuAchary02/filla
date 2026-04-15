@@ -7,7 +7,15 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 def ensure_profile_exists(user_id: str):
-    response = supabase_client.table("user_profiles").select("*").eq("user_id", user_id).limit(1).execute()
+    # Explicitly select all columns including personal info fields
+    response = supabase_client.table("user_profiles").select(
+        "id,user_id,job_search_timeline,location,resume_url,"
+        "first_name,middle_name,last_name,preferred_name,suffix_name,"
+        "phone,birthday,address,address_2,address_3,"
+        "experience_level,role,work_experience,education,projects,"
+        "links,skills,languages,min_salary,onboarding_completed,"
+        "created_at,updated_at"
+    ).eq("user_id", user_id).limit(1).execute()
     if response.data and len(response.data) > 0:
         return response.data[0]
 
@@ -31,7 +39,14 @@ def ensure_profile_exists(user_id: str):
     if insert_response.data and len(insert_response.data) > 0:
         return insert_response.data[0]
 
-    response = supabase_client.table("user_profiles").select("*").eq("user_id", user_id).limit(1).execute()
+    response = supabase_client.table("user_profiles").select(
+        "id,user_id,job_search_timeline,location,resume_url,"
+        "first_name,middle_name,last_name,preferred_name,suffix_name,"
+        "phone,birthday,address,address_2,address_3,"
+        "experience_level,role,work_experience,education,projects,"
+        "links,skills,languages,min_salary,onboarding_completed,"
+        "created_at,updated_at"
+    ).eq("user_id", user_id).limit(1).execute()
     if response.data and len(response.data) > 0:
         return response.data[0]
 
@@ -173,6 +188,16 @@ async def get_current_user(authorization: str = Header(None)):
             job_search_timeline=profile_data.get("job_search_timeline"),
             location=profile_data.get("location"),
             resume_url=profile_data.get("resume_url"),
+            first_name=profile_data.get("first_name"),
+            middle_name=profile_data.get("middle_name"),
+            last_name=profile_data.get("last_name"),
+            preferred_name=profile_data.get("preferred_name"),
+            suffix_name=profile_data.get("suffix_name"),
+            phone=profile_data.get("phone"),
+            birthday=profile_data.get("birthday"),
+            address=profile_data.get("address"),
+            address_2=profile_data.get("address_2"),
+            address_3=profile_data.get("address_3"),
             experience_level=profile_data.get("experience_level"),
             role=profile_data.get("role"),
             work_experience=profile_data.get("work_experience") or [],

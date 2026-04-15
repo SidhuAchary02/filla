@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import { useAuth } from '../lib/useAuth'
 import { useNavigate } from 'react-router-dom'
 import { logout as logoutService } from '../lib/authService'
-
+import PersonalInfoDrawer from './drawers/PersonalInfoDrawer'
+import EmploymentInfoDrawer from './drawers/EmploymentInfoDrawer'
+import SummaryDrawer from './drawers/SummaryDrawer'
 
 const menuItems = [
   { label: 'Profile', subtitle: 'Edit autofill information', emoji: '✏️' },
@@ -43,6 +46,11 @@ function getInitials(name) {
 }
 
 function getDisplayName(profile, email) {
+  // Try to construct from first_name, middle_name, last_name
+  const parts = [profile?.first_name, profile?.middle_name, profile?.last_name].filter(Boolean)
+  if (parts.length > 0) return parts.join(' ')
+  
+  // Fallback to legacy fields
   if (profile?.full_name) return profile.full_name
   if (profile?.name) return profile.name
   if (email) {
@@ -89,6 +97,35 @@ function SectionCard({ title, children, action }) {
   const languages = Array.isArray(profile.languages) ? profile.languages : []
   const location = profile.location || {}
   const links = profile.links || {}
+
+  // Get auth token
+  const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
+
+  // Drawer state
+  const [openDrawer, setOpenDrawer] = useState(null)
+
+  const handleDrawerOpen = (drawerName) => {
+    setOpenDrawer(drawerName)
+  }
+
+  const handleDrawerClose = () => {
+    setOpenDrawer(null)
+  }
+
+  const handleSavePersonalInfo = async (formData) => {
+    // Profile will be updated via API in PersonalInfoDrawer
+    console.log('Personal info saved successfully')
+  }
+
+  const handleSaveEmploymentInfo = async (formData) => {
+    // Profile will be updated via API in EmploymentInfoDrawer
+    console.log('Employment info saved successfully')
+  }
+
+  const handleSaveSummary = async (formData) => {
+    // Profile will be updated via API in SummaryDrawer
+    console.log('Summary saved successfully')
+  }
 
   const displayName = getDisplayName(profile, user?.email)
   const statusLabel = profile.job_search_timeline || 'Actively looking'
@@ -265,14 +302,20 @@ function SectionCard({ title, children, action }) {
             <SectionCard
               title="Personal Info"
               action={
-                <button type="button" className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Edit personal info">
+                <button 
+                  type="button" 
+                  onClick={() => handleDrawerOpen('personal')}
+                  className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" 
+                  aria-label="Edit personal info"
+                >
                   ✎
                 </button>
               }
             >
               <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                <InfoItem label="First Name" value={(profile.full_name || displayName).split(' ')[0] || 'Not provided'} />
-                <InfoItem label="Last Name" value={(profile.full_name || displayName).split(' ').slice(1).join(' ') || '-'} />
+                <InfoItem label="First Name" value={profile.first_name || '-'} />
+                <InfoItem label="Middle Name" value={profile.middle_name || '-'} />
+                <InfoItem label="Last Name" value={profile.last_name || '-'} />
                 <InfoItem label="Preferred Name" value={profile.preferred_name || '-'} />
                 <InfoItem label="Suffix Name" value={profile.suffix_name || '-'} />
                 <InfoItem label="Email Address" value={user?.email || 'Not provided'} />
@@ -289,7 +332,12 @@ function SectionCard({ title, children, action }) {
             <SectionCard
               title="Employment Information"
               action={
-                <button type="button" className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Edit employment info">
+                <button 
+                  type="button" 
+                  onClick={() => handleDrawerOpen('employment')}
+                  className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" 
+                  aria-label="Edit employment info"
+                >
                   ✎
                 </button>
               }
@@ -412,7 +460,19 @@ function SectionCard({ title, children, action }) {
               </SectionCard>
             </div>
 
-            <SectionCard title="Summary">
+            <SectionCard 
+              title="Summary"
+              action={
+                <button 
+                  type="button" 
+                  onClick={() => handleDrawerOpen('summary')}
+                  className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" 
+                  aria-label="Edit summary"
+                >
+                  ✎
+                </button>
+              }
+            >
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <InfoItem label="Role" value={profile.role || 'Not provided'} />
                 <InfoItem label="Experience Level" value={profile.experience_level || 'Not provided'} />
@@ -432,6 +492,32 @@ function SectionCard({ title, children, action }) {
           </section>
         </div>
       </main>
+
+      {/* Drawer Components */}
+      <PersonalInfoDrawer
+        isOpen={openDrawer === 'personal'}
+        onClose={handleDrawerClose}
+        profile={profile}
+        user={user}
+        onSave={handleSavePersonalInfo}
+        token={token}
+      />
+
+      <EmploymentInfoDrawer
+        isOpen={openDrawer === 'employment'}
+        onClose={handleDrawerClose}
+        profile={profile}
+        onSave={handleSaveEmploymentInfo}
+        token={token}
+      />
+
+      <SummaryDrawer
+        isOpen={openDrawer === 'summary'}
+        onClose={handleDrawerClose}
+        profile={profile}
+        onSave={handleSaveSummary}
+        token={token}
+      />
 
       <button
         type="button"

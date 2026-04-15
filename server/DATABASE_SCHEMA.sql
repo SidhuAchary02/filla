@@ -16,6 +16,18 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   -- Resume
   resume_url varchar(500),
   
+  -- Personal Information
+  first_name varchar(255),
+  middle_name varchar(255),
+  last_name varchar(255),
+  preferred_name varchar(255),
+  suffix_name varchar(50),
+  phone varchar(20),
+  birthday date,
+  address varchar(500),
+  address_2 varchar(500),
+  address_3 varchar(500),
+  
   -- Experience Level
   experience_level varchar(50), -- "internship", "entry", "junior", "mid", "senior", "expert"
   
@@ -51,6 +63,16 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS job_search_timeline varchar(50);
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS location jsonb DEFAULT 'null'::jsonb;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS resume_url varchar(500);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS first_name varchar(255);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS middle_name varchar(255);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS last_name varchar(255);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_name varchar(255);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS suffix_name varchar(50);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS phone varchar(20);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS birthday date;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS address varchar(500);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS address_2 varchar(500);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS address_3 varchar(500);
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS experience_level varchar(50);
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS role varchar(255);
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS work_experience jsonb DEFAULT '[]'::jsonb;

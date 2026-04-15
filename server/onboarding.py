@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status, Header
-from models import OnboardingRequest, OnboardingResponse
+from models import OnboardingRequest, OnboardingResponse, PersonalInfoRequest
 from database import supabase_client
 from datetime import datetime
 
@@ -46,6 +46,16 @@ def _serialize_profile(profile: dict) -> OnboardingResponse:
         job_search_timeline=profile.get("job_search_timeline"),
         location=profile.get("location"),
         resume_url=profile.get("resume_url"),
+        first_name=profile.get("first_name"),
+        middle_name=profile.get("middle_name"),
+        last_name=profile.get("last_name"),
+        preferred_name=profile.get("preferred_name"),
+        suffix_name=profile.get("suffix_name"),
+        phone=profile.get("phone"),
+        birthday=profile.get("birthday"),
+        address=profile.get("address"),
+        address_2=profile.get("address_2"),
+        address_3=profile.get("address_3"),
         experience_level=profile.get("experience_level"),
         role=profile.get("role"),
         work_experience=profile.get("work_experience") or [],
@@ -62,7 +72,15 @@ def _serialize_profile(profile: dict) -> OnboardingResponse:
 
 
 def _get_profile_by_user_id(user_id: str):
-    response = supabase_client.table("user_profiles").select("*").eq("user_id", user_id).limit(1).execute()
+    # Explicitly select all columns including personal info fields
+    response = supabase_client.table("user_profiles").select(
+        "id,user_id,job_search_timeline,location,resume_url,"
+        "first_name,middle_name,last_name,preferred_name,suffix_name,"
+        "phone,birthday,address,address_2,address_3,"
+        "experience_level,role,work_experience,education,projects,"
+        "links,skills,languages,min_salary,onboarding_completed,"
+        "created_at,updated_at"
+    ).eq("user_id", user_id).limit(1).execute()
     if response.data and len(response.data) > 0:
         return response.data[0]
     return None
@@ -192,6 +210,67 @@ async def get_user_profile(authorization: str = Header(None)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch user profile: {str(e)}"
+        )
+
+
+# ============ UPDATE PERSONAL INFO ============
+@router.post("/personal-info", response_model=OnboardingResponse)
+async def update_personal_info(
+    request: PersonalInfoRequest,
+    authorization: str = Header(None)
+):
+    """Update user's personal information."""
+    user_id = verify_token(authorization)
+
+    try:
+        _ensure_profile_exists(user_id)
+
+        # Build payload with only provided fields
+        payload = {
+            "updated_at": datetime.utcnow().isoformat()
+        }
+
+        # Add fields that were provided (not None)
+        if request.first_name is not None:
+            payload["first_name"] = request.first_name
+        if request.middle_name is not None:
+            payload["middle_name"] = request.middle_name
+        if request.last_name is not None:
+            payload["last_name"] = request.last_name
+        if request.preferred_name is not None:
+            payload["preferred_name"] = request.preferred_name
+        if request.suffix_name is not None:
+            payload["suffix_name"] = request.suffix_name
+        if request.phone is not None:
+            payload["phone"] = request.phone
+        if request.birthday is not None:
+            payload["birthday"] = request.birthday
+        if request.address is not None:
+            payload["address"] = request.address
+        if request.address_2 is not None:
+            payload["address_2"] = request.address_2
+        if request.address_3 is not None:
+            payload["address_3"] = request.address_3
+        if request.location is not None:
+            payload["location"] = _to_dict(request.location)
+
+        supabase_client.table("user_profiles").update(payload).eq("user_id", user_id).execute()
+        profile = _get_profile_by_user_id(user_id)
+
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Profile update failed"
+            )
+
+        return _serialize_profile(profile)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update personal info: {str(e)}"
         )
 
 

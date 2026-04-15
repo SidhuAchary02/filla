@@ -66,12 +66,38 @@ class OnboardingRequest(BaseModel):
     languages: List[str] = Field(default=[])
     min_salary: Optional[float] = None
 
+# ============ PERSONAL INFO MODELS ============
+class PersonalInfoRequest(BaseModel):
+    first_name: Optional[str] = None
+    middle_name: Optional[str] = None
+    last_name: Optional[str] = None
+    preferred_name: Optional[str] = None
+    suffix_name: Optional[str] = None
+    phone: Optional[str] = None
+    birthday: Optional[str] = None  # ISO format: YYYY-MM-DD
+    address: Optional[str] = None
+    address_2: Optional[str] = None
+    address_3: Optional[str] = None
+    location: Optional[LocationModel] = None
+
 class OnboardingResponse(BaseModel):
     id: str
     user_id: str
     job_search_timeline: Optional[str]
     location: Optional[dict]
     resume_url: Optional[str]
+    # Personal Information
+    first_name: Optional[str] = None
+    middle_name: Optional[str] = None
+    last_name: Optional[str] = None
+    preferred_name: Optional[str] = None
+    suffix_name: Optional[str] = None
+    phone: Optional[str] = None
+    birthday: Optional[str] = None
+    address: Optional[str] = None
+    address_2: Optional[str] = None
+    address_3: Optional[str] = None
+    # Rest of profile info
     experience_level: Optional[str]
     role: Optional[str]
     work_experience: List[dict]
@@ -84,6 +110,8 @@ class OnboardingResponse(BaseModel):
     onboarding_completed: bool
     created_at: datetime
     updated_at: datetime
+
+    model_config = {"from_attributes": True}
 
 # ============ USER PROFILE MODELS ============
 
@@ -93,6 +121,18 @@ class UserProfileResponse(BaseModel):
     job_search_timeline: Optional[str]
     location: Optional[dict]
     resume_url: Optional[str]
+    # Personal Information
+    first_name: Optional[str] = None
+    middle_name: Optional[str] = None
+    last_name: Optional[str] = None
+    preferred_name: Optional[str] = None
+    suffix_name: Optional[str] = None
+    phone: Optional[str] = None
+    birthday: Optional[str] = None
+    address: Optional[str] = None
+    address_2: Optional[str] = None
+    address_3: Optional[str] = None
+    # Rest of profile
     experience_level: Optional[str]
     role: Optional[str]
     work_experience: List[dict]
@@ -105,6 +145,8 @@ class UserProfileResponse(BaseModel):
     onboarding_completed: bool
     created_at: datetime
     updated_at: datetime
+    
+    model_config = {"from_attributes": True}
 
 class CurrentUserResponse(BaseModel):
     id: str

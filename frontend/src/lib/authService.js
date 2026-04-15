@@ -184,6 +184,30 @@ export async function getUserProfile(token) {
   }
 }
 
+// ============ UPDATE USER PROFILE ============
+export async function updateUserProfile(data, token) {
+  try {
+    const response = await fetch(`${API_URL}/personal-info`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || 'Failed to update profile')
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error('Update user profile error:', error)
+    throw error
+  }
+}
+
 // ============ LOGOUT ============
 export function logout() {
   localStorage.removeItem('auth_token')
