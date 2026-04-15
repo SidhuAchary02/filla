@@ -8,6 +8,10 @@ import EmploymentInfoDrawer from './drawers/EmploymentInfoDrawer'
 import SummaryDrawer from './drawers/SummaryDrawer'
 import JobSearchStatusDrawer from './drawers/JobSearchStatusDrawer'
 import SkillsDrawer from './drawers/SkillsDrawer'
+import LanguagesDrawer from './drawers/LanguagesDrawer'
+import EducationDrawer from './drawers/EducationDrawer'
+import WorkExperienceDrawer from './drawers/WorkExperienceDrawer'
+import ProjectsDrawer from './drawers/ProjectsDrawer'
 
 const menuItems = [
   { label: 'Profile', subtitle: 'Edit autofill information', emoji: '✏️' },
@@ -138,6 +142,26 @@ function SectionCard({ title, children, action }) {
   const handleSaveSkills = async (formData) => {
     // Profile will be updated via API in SkillsDrawer
     console.log('Skills saved successfully')
+  }
+
+  const handleSaveLanguages = async (formData) => {
+    // Profile will be updated via API in LanguagesDrawer
+    console.log('Languages saved successfully')
+  }
+
+  const handleSaveEducation = async (formData) => {
+    // Profile will be updated via API in EducationDrawer
+    console.log('Education saved successfully')
+  }
+
+  const handleSaveWorkExperience = async (formData) => {
+    // Profile will be updated via API in WorkExperienceDrawer
+    console.log('Work experience saved successfully')
+  }
+
+  const handleSaveProjects = async (formData) => {
+    // Profile will be updated via API in ProjectsDrawer
+    console.log('Projects saved successfully')
   }
 
   const displayName = getDisplayName(profile, user?.email)
@@ -405,7 +429,19 @@ function SectionCard({ title, children, action }) {
                 </div>
               </SectionCard>
 
-              <SectionCard title="Languages">
+              <SectionCard 
+                title="Languages"
+                action={
+                  <button 
+                    type="button" 
+                    onClick={() => handleDrawerOpen('languages')}
+                    className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 cursor-pointer" 
+                    aria-label="Edit languages"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                }
+              >
                 <div className="flex flex-wrap gap-2">
                   {languages.length > 0 ? (
                     languages.map((language, index) => (
@@ -424,7 +460,19 @@ function SectionCard({ title, children, action }) {
             </div>
 
             <div className="grid gap-6 xl:grid-cols-2">
-              <SectionCard title="Education">
+              <SectionCard 
+                title="Education"
+                action={
+                  <button 
+                    type="button" 
+                    onClick={() => handleDrawerOpen('education')}
+                    className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 cursor-pointer" 
+                    aria-label="Edit education"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                }
+              >
                 <div className="space-y-3">
                   {education.length > 0 ? (
                     education.map((item, index) => (
@@ -440,7 +488,19 @@ function SectionCard({ title, children, action }) {
                 </div>
               </SectionCard>
 
-              <SectionCard title="Work Experience">
+              <SectionCard 
+                title="Work Experience"
+                action={
+                  <button 
+                    type="button" 
+                    onClick={() => handleDrawerOpen('workExperience')}
+                    className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 cursor-pointer" 
+                    aria-label="Edit work experience"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                }
+              >
                 <div className="space-y-3">
                   {workExperience.length > 0 ? (
                     workExperience.map((item, index) => (
@@ -458,7 +518,19 @@ function SectionCard({ title, children, action }) {
             </div>
 
             <div className="grid gap-6 xl:grid-cols-2">
-              <SectionCard title="Projects">
+              <SectionCard 
+                title="Projects"
+                action={
+                  <button 
+                    type="button" 
+                    onClick={() => handleDrawerOpen('projects')}
+                    className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 cursor-pointer" 
+                    aria-label="Edit projects"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                }
+              >
                 <div className="space-y-3">
                   {projects.length > 0 ? (
                     projects.map((item, index) => (
@@ -490,36 +562,6 @@ function SectionCard({ title, children, action }) {
                   </div>
                 </div>
               </SectionCard>
-            </div>
-
-            <SectionCard 
-              title="Summary"
-              action={
-                <button 
-                  type="button" 
-                  onClick={() => handleDrawerOpen('summary')}
-                  className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" 
-                  aria-label="Edit summary"
-                >
-                  ✎
-                </button>
-              }
-            >
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <InfoItem label="Role" value={profile.role || 'Not provided'} />
-                <InfoItem label="Experience Level" value={profile.experience_level || 'Not provided'} />
-                <InfoItem label="Minimum Salary" value={formatSalary(profile)} />
-                <InfoItem label="Job Timeline" value={profile.job_search_timeline || 'Not provided'} />
-              </div>
-            </SectionCard>
-
-            <div className="flex justify-end pb-8">
-              <button
-                onClick={handleEditProfile}
-                className="rounded-xl bg-cyan-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-700"
-              >
-                Edit Profile
-              </button>
             </div>
           </section>
         </div>
@@ -565,6 +607,38 @@ function SectionCard({ title, children, action }) {
         onClose={handleDrawerClose}
         profile={profile}
         onSave={handleSaveSkills}
+        token={token}
+      />
+
+      <LanguagesDrawer
+        isOpen={openDrawer === 'languages'}
+        onClose={handleDrawerClose}
+        profile={profile}
+        onSave={handleSaveLanguages}
+        token={token}
+      />
+
+      <EducationDrawer
+        isOpen={openDrawer === 'education'}
+        onClose={handleDrawerClose}
+        profile={profile}
+        onSave={handleSaveEducation}
+        token={token}
+      />
+
+      <WorkExperienceDrawer
+        isOpen={openDrawer === 'workExperience'}
+        onClose={handleDrawerClose}
+        profile={profile}
+        onSave={handleSaveWorkExperience}
+        token={token}
+      />
+
+      <ProjectsDrawer
+        isOpen={openDrawer === 'projects'}
+        onClose={handleDrawerClose}
+        profile={profile}
+        onSave={handleSaveProjects}
         token={token}
       />
 

@@ -81,6 +81,10 @@ class PersonalInfoRequest(BaseModel):
     job_search_timeline: Optional[str] = None
     location: Optional[LocationModel] = None
     skills: Optional[List[str]] = None  # List of skill names
+    languages: Optional[List[str]] = None  # List of language names
+    education: Optional[List[dict]] = None  # List of education objects
+    work_experience: Optional[List[dict]] = None  # List of work experience objects
+    projects: Optional[List[dict]] = None  # List of project objects
 
 class OnboardingResponse(BaseModel):
     id: str

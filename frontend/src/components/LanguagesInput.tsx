@@ -12,6 +12,7 @@ type LanguagesInputProps = {
   placeholder?: string
   className?: string
   apiBaseUrl?: string
+  disabled?: boolean
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -66,15 +67,16 @@ const filterByQuery = (languages: LanguageOption[], query: string) => {
   })
 }
 
-const Badge = ({ children, onRemove, label }: { children: React.ReactNode; onRemove?: () => void; label?: string }) => (
+const Badge = ({ children, onRemove, label, disabled = false }: { children: React.ReactNode; onRemove?: () => void; label?: string; disabled?: boolean }) => (
   <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200">
     {children}
     {onRemove ? (
       <button
         type="button"
         onClick={onRemove}
+        disabled={disabled}
         aria-label={label || 'Remove language'}
-        className="rounded-full text-emerald-500 transition hover:text-emerald-700"
+        className="rounded-full text-emerald-500 transition hover:text-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         ×
       </button>
@@ -88,6 +90,7 @@ export default function LanguagesInput({
   placeholder = 'Search or add a language',
   className = '',
   apiBaseUrl = API_BASE_URL,
+  disabled = false,
 }: LanguagesInputProps) {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [query, setQuery] = useState('')
@@ -243,7 +246,7 @@ export default function LanguagesInput({
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100">
         <div className="flex min-h-12 flex-wrap gap-2 px-3 py-2">
           {selectedLanguages.map(language => (
-            <Badge key={language.normalized} onRemove={() => removeLanguage(language.normalized)} label={`Remove ${language.name}`}>
+            <Badge key={language.normalized} onRemove={() => removeLanguage(language.normalized)} label={`Remove ${language.name}`} disabled={disabled}>
               {language.name}
             </Badge>
           ))}
@@ -258,7 +261,8 @@ export default function LanguagesInput({
             onFocus={() => setOpen(true)}
             onKeyDown={handleKeyDown}
             placeholder={selectedLanguages.length ? '' : placeholder}
-            className="min-w-55 flex-1 border-0 p-0 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-0"
+            disabled={disabled}
+            className="min-w-55 flex-1 border-0 p-0 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-0 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
           />
         </div>
       </div>

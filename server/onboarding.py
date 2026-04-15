@@ -257,6 +257,14 @@ async def update_personal_info(
             payload["location"] = _to_dict(request.location)
         if request.skills is not None:
             payload["skills"] = request.skills
+        if request.languages is not None:
+            payload["languages"] = request.languages
+        if request.education is not None:
+            payload["education"] = request.education
+        if request.work_experience is not None:
+            payload["work_experience"] = request.work_experience
+        if request.projects is not None:
+            payload["projects"] = request.projects
 
         print(f"🔧 Update payload for user {user_id}: {payload}")
         
@@ -286,6 +294,27 @@ async def update_personal_info(
                 print(f"   - Skills type in DB: {type(profile.get('skills'))}")
                 print(f"   - Skills type expected: {type(payload.get('skills'))}")
                 print(f"   - Skills match: {profile.get('skills') == payload.get('skills')}")
+            if request.languages is not None:
+                print(f"   - languages in DB: {profile.get('languages')}")
+                print(f"   - Expected languages: {payload.get('languages', 'N/A')}")
+                print(f"   - Languages type in DB: {type(profile.get('languages'))}")
+                print(f"   - Languages type expected: {type(payload.get('languages'))}")
+                print(f"   - Languages match: {profile.get('languages') == payload.get('languages')}")
+            if request.education is not None:
+                print(f"   - education in DB: {profile.get('education')}")
+                print(f"   - Expected education: {payload.get('education', 'N/A')}")
+                print(f"   - Education length: {len(profile.get('education', []))}")
+                print(f"   - Education match: {profile.get('education') == payload.get('education')}")
+            if request.work_experience is not None:
+                print(f"   - work_experience in DB: {profile.get('work_experience')}")
+                print(f"   - Expected work_experience: {payload.get('work_experience', 'N/A')}")
+                print(f"   - Work experience length: {len(profile.get('work_experience', []))}")
+                print(f"   - Work experience match: {profile.get('work_experience') == payload.get('work_experience')}")
+            if request.projects is not None:
+                print(f"   - projects in DB: {profile.get('projects')}")
+                print(f"   - Expected projects: {payload.get('projects', 'N/A')}")
+                print(f"   - Projects length: {len(profile.get('projects', []))}")
+                print(f"   - Projects match: {profile.get('projects') == payload.get('projects')}")
         else:
             print(f"❌ NO PROFILE FOUND after update!")
             raise HTTPException(
