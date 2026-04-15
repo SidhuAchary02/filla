@@ -85,6 +85,16 @@ class PersonalInfoRequest(BaseModel):
     education: Optional[List[dict]] = None  # List of education objects
     work_experience: Optional[List[dict]] = None  # List of work experience objects
     projects: Optional[List[dict]] = None  # List of project objects
+    links: Optional[LinksModel] = None  # Social and portfolio links
+    ethnicity: Optional[str] = None
+    work_authorized_us: Optional[str] = None
+    work_authorized_canada: Optional[str] = None
+    work_authorized_uk: Optional[str] = None
+    sponsorship_required: Optional[str] = None
+    disability: Optional[str] = None
+    lgbtq: Optional[str] = None
+    gender: Optional[str] = None
+    veteran: Optional[str] = None
 
 class OnboardingResponse(BaseModel):
     id: str
@@ -103,6 +113,16 @@ class OnboardingResponse(BaseModel):
     address: Optional[str] = None
     address_2: Optional[str] = None
     address_3: Optional[str] = None
+    # Employment Information
+    ethnicity: Optional[str] = None
+    work_authorized_us: Optional[str] = None
+    work_authorized_canada: Optional[str] = None
+    work_authorized_uk: Optional[str] = None
+    sponsorship_required: Optional[str] = None
+    disability: Optional[str] = None
+    lgbtq: Optional[str] = None
+    gender: Optional[str] = None
+    veteran: Optional[str] = None
     # Rest of profile info
     experience_level: Optional[str]
     role: Optional[str]
@@ -138,6 +158,16 @@ class UserProfileResponse(BaseModel):
     address: Optional[str] = None
     address_2: Optional[str] = None
     address_3: Optional[str] = None
+    # Employment Information
+    ethnicity: Optional[str] = None
+    work_authorized_us: Optional[str] = None
+    work_authorized_canada: Optional[str] = None
+    work_authorized_uk: Optional[str] = None
+    sponsorship_required: Optional[str] = None
+    disability: Optional[str] = None
+    lgbtq: Optional[str] = None
+    gender: Optional[str] = None
+    veteran: Optional[str] = None
     # Rest of profile
     experience_level: Optional[str]
     role: Optional[str]

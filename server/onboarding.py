@@ -56,6 +56,15 @@ def _serialize_profile(profile: dict) -> OnboardingResponse:
         address=profile.get("address"),
         address_2=profile.get("address_2"),
         address_3=profile.get("address_3"),
+        ethnicity=profile.get("ethnicity"),
+        work_authorized_us=profile.get("work_authorized_us"),
+        work_authorized_canada=profile.get("work_authorized_canada"),
+        work_authorized_uk=profile.get("work_authorized_uk"),
+        sponsorship_required=profile.get("sponsorship_required"),
+        disability=profile.get("disability"),
+        lgbtq=profile.get("lgbtq"),
+        gender=profile.get("gender"),
+        veteran=profile.get("veteran"),
         experience_level=profile.get("experience_level"),
         role=profile.get("role"),
         work_experience=profile.get("work_experience") or [],
@@ -72,13 +81,15 @@ def _serialize_profile(profile: dict) -> OnboardingResponse:
 
 
 def _get_profile_by_user_id(user_id: str):
-    # Explicitly select all columns including personal info fields
+    # Explicitly select all columns including personal info and employment info fields
     response = supabase_client.table("user_profiles").select(
         "id,user_id,job_search_timeline,location,resume_url,"
         "first_name,middle_name,last_name,preferred_name,suffix_name,"
         "phone,birthday,address,address_2,address_3,"
         "experience_level,role,work_experience,education,projects,"
         "links,skills,languages,min_salary,onboarding_completed,"
+        "ethnicity,work_authorized_us,work_authorized_canada,work_authorized_uk,"
+        "sponsorship_required,disability,lgbtq,gender,veteran,"
         "created_at,updated_at"
     ).eq("user_id", user_id).limit(1).execute()
     if response.data and len(response.data) > 0:
@@ -265,6 +276,26 @@ async def update_personal_info(
             payload["work_experience"] = request.work_experience
         if request.projects is not None:
             payload["projects"] = request.projects
+        if request.links is not None:
+            payload["links"] = _to_dict(request.links)
+        if request.ethnicity is not None:
+            payload["ethnicity"] = request.ethnicity
+        if request.work_authorized_us is not None:
+            payload["work_authorized_us"] = request.work_authorized_us
+        if request.work_authorized_canada is not None:
+            payload["work_authorized_canada"] = request.work_authorized_canada
+        if request.work_authorized_uk is not None:
+            payload["work_authorized_uk"] = request.work_authorized_uk
+        if request.sponsorship_required is not None:
+            payload["sponsorship_required"] = request.sponsorship_required
+        if request.disability is not None:
+            payload["disability"] = request.disability
+        if request.lgbtq is not None:
+            payload["lgbtq"] = request.lgbtq
+        if request.gender is not None:
+            payload["gender"] = request.gender
+        if request.veteran is not None:
+            payload["veteran"] = request.veteran
 
         print(f"🔧 Update payload for user {user_id}: {payload}")
         
@@ -315,6 +346,38 @@ async def update_personal_info(
                 print(f"   - Expected projects: {payload.get('projects', 'N/A')}")
                 print(f"   - Projects length: {len(profile.get('projects', []))}")
                 print(f"   - Projects match: {profile.get('projects') == payload.get('projects')}")
+            if request.links is not None:
+                print(f"   - links in DB: {profile.get('links')}")
+                print(f"   - Expected links: {payload.get('links', 'N/A')}")
+                print(f"   - Links match: {profile.get('links') == payload.get('links')}")
+            if request.ethnicity is not None:
+                print(f"   - ethnicity in DB: {profile.get('ethnicity')}")
+                print(f"   - Expected ethnicity: {payload.get('ethnicity', 'N/A')}")
+                print(f"   - Ethnicity match: {profile.get('ethnicity') == payload.get('ethnicity')}")
+            if request.work_authorized_us is not None:
+                print(f"   - work_authorized_us in DB: {profile.get('work_authorized_us')}")
+                print(f"   - Expected: {payload.get('work_authorized_us', 'N/A')}")
+            if request.work_authorized_canada is not None:
+                print(f"   - work_authorized_canada in DB: {profile.get('work_authorized_canada')}")
+                print(f"   - Expected: {payload.get('work_authorized_canada', 'N/A')}")
+            if request.work_authorized_uk is not None:
+                print(f"   - work_authorized_uk in DB: {profile.get('work_authorized_uk')}")
+                print(f"   - Expected: {payload.get('work_authorized_uk', 'N/A')}")
+            if request.sponsorship_required is not None:
+                print(f"   - sponsorship_required in DB: {profile.get('sponsorship_required')}")
+                print(f"   - Expected: {payload.get('sponsorship_required', 'N/A')}")
+            if request.disability is not None:
+                print(f"   - disability in DB: {profile.get('disability')}")
+                print(f"   - Expected: {payload.get('disability', 'N/A')}")
+            if request.lgbtq is not None:
+                print(f"   - lgbtq in DB: {profile.get('lgbtq')}")
+                print(f"   - Expected: {payload.get('lgbtq', 'N/A')}")
+            if request.gender is not None:
+                print(f"   - gender in DB: {profile.get('gender')}")
+                print(f"   - Expected: {payload.get('gender', 'N/A')}")
+            if request.veteran is not None:
+                print(f"   - veteran in DB: {profile.get('veteran')}")
+                print(f"   - Expected: {payload.get('veteran', 'N/A')}")
         else:
             print(f"❌ NO PROFILE FOUND after update!")
             raise HTTPException(

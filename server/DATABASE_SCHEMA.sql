@@ -53,6 +53,17 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   -- Salary Expectation
   min_salary decimal(12, 2),
   
+  -- Employment Information
+  ethnicity varchar(255),
+  work_authorized_us varchar(50), -- "Yes", "No", "Prefer not to answer"
+  work_authorized_canada varchar(50),
+  work_authorized_uk varchar(50),
+  sponsorship_required varchar(50), -- "Yes", "No", "Prefer not to answer"
+  disability varchar(50), -- "Yes", "No", "Prefer not to answer"
+  lgbtq varchar(50), -- "Yes", "No", "Prefer not to answer"
+  gender varchar(50), -- "Male", "Female", "Non-binary", etc.
+  veteran varchar(50), -- "Yes", "No", "Prefer not to answer"
+  
   -- Metadata
   onboarding_completed boolean DEFAULT false,
   created_at timestamp with time zone DEFAULT now(),
@@ -82,6 +93,15 @@ ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS links jsonb DEFAULT 'null'::j
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS skills jsonb DEFAULT '[]'::jsonb;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS languages jsonb DEFAULT '[]'::jsonb;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS min_salary decimal(12, 2);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS ethnicity varchar(255);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS work_authorized_us varchar(50);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS work_authorized_canada varchar(50);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS work_authorized_uk varchar(50);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS sponsorship_required varchar(50);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS disability varchar(50);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS lgbtq varchar(50);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS gender varchar(50);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS veteran varchar(50);
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS onboarding_completed boolean DEFAULT false;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS created_at timestamp with time zone DEFAULT now();
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone DEFAULT now();
