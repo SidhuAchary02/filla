@@ -251,16 +251,38 @@ async def update_personal_info(
             payload["address_2"] = request.address_2
         if request.address_3 is not None:
             payload["address_3"] = request.address_3
+        if request.job_search_timeline is not None:
+            payload["job_search_timeline"] = request.job_search_timeline
         if request.location is not None:
             payload["location"] = _to_dict(request.location)
 
-        supabase_client.table("user_profiles").update(payload).eq("user_id", user_id).execute()
-        profile = _get_profile_by_user_id(user_id)
-
-        if not profile:
+        print(f"🔧 Update payload for user {user_id}: {payload}")
+        
+        try:
+            # Try update via Supabase SDK
+            update_response = supabase_client.table("user_profiles").update(payload).eq("user_id", user_id).execute()
+            print(f"📡 Supabase update via SDK: success")
+            print(f"📡 Response data count: {len(update_response.data) if hasattr(update_response, 'data') and update_response.data else 0}")
+        except Exception as update_err:
+            print(f"❌ SDK Update error: {update_err}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Profile update failed"
+                detail=f"Failed to update profile: {str(update_err)}"
+            )
+        
+        # Fetch fresh profile after update using explicit SELECT
+        profile = _get_profile_by_user_id(user_id)
+        
+        if profile:
+            print(f"✅ Profile after update:")
+            print(f"   - job_search_timeline in DB: {profile.get('job_search_timeline')}")
+            print(f"   - Expected: {payload.get('job_search_timeline', 'N/A')}")
+            print(f"   - Match: {profile.get('job_search_timeline') == payload.get('job_search_timeline')}")
+        else:
+            print(f"❌ NO PROFILE FOUND after update!")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Profile fetch after update failed"
             )
 
         return _serialize_profile(profile)

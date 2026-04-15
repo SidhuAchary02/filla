@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { useAuth } from '../lib/useAuth'
 import { useNavigate } from 'react-router-dom'
+import {Pencil} from 'lucide-react'
 import { logout as logoutService } from '../lib/authService'
 import PersonalInfoDrawer from './drawers/PersonalInfoDrawer'
 import EmploymentInfoDrawer from './drawers/EmploymentInfoDrawer'
 import SummaryDrawer from './drawers/SummaryDrawer'
+import JobSearchStatusDrawer from './drawers/JobSearchStatusDrawer'
+import SkillsDrawer from './drawers/SkillsDrawer'
 
 const menuItems = [
   { label: 'Profile', subtitle: 'Edit autofill information', emoji: '✏️' },
@@ -127,6 +130,16 @@ function SectionCard({ title, children, action }) {
     console.log('Summary saved successfully')
   }
 
+  const handleSaveJobSearchStatus = async (formData) => {
+    // Profile will be updated via API in JobSearchStatusDrawer
+    console.log('Job search status saved successfully')
+  }
+
+  const handleSaveSkills = async (formData) => {
+    // Profile will be updated via API in SkillsDrawer
+    console.log('Skills saved successfully')
+  }
+
   const displayName = getDisplayName(profile, user?.email)
   const statusLabel = profile.job_search_timeline || 'Actively looking'
   const completionPercent = Math.min(
@@ -186,8 +199,14 @@ function SectionCard({ title, children, action }) {
           <aside className="space-y-4">
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex justify-end">
-                <button type="button" className="rounded-md p-1 text-cyan-600 transition hover:bg-cyan-50" aria-label="Edit profile summary">
-                  ✎
+                <button 
+                  type="button" 
+                  onClick={() => handleDrawerOpen('jobSearch')}
+                  className="rounded-md p-1 text-cyan-600 transition hover:bg-cyan-50 cursor-pointer" 
+                  aria-label="Edit job search status"
+                >
+                  <Pencil size={16} />
+                  
                 </button>
               </div>
 
@@ -207,7 +226,7 @@ function SectionCard({ title, children, action }) {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            {/* <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <p className="px-1 pb-3 text-sm font-semibold text-slate-900">My Career Hub</p>
               <div className="space-y-3">
                 {menuItems.map(item => (
@@ -232,7 +251,7 @@ function SectionCard({ title, children, action }) {
                   </button>
                 ))}
               </div>
-            </section>
+            </section> */}
 
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="mb-4">
@@ -305,10 +324,11 @@ function SectionCard({ title, children, action }) {
                 <button 
                   type="button" 
                   onClick={() => handleDrawerOpen('personal')}
-                  className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" 
+                  className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 cursor-pointer" 
                   aria-label="Edit personal info"
                 >
-                  ✎
+                  <Pencil size={16} />
+                  
                 </button>
               }
             >
@@ -356,7 +376,19 @@ function SectionCard({ title, children, action }) {
             </SectionCard>
 
             <div className="grid gap-6 xl:grid-cols-2">
-              <SectionCard title="Skills">
+              <SectionCard 
+                title="Skills"
+                action={
+                  <button 
+                    type="button" 
+                    onClick={() => handleDrawerOpen('skills')}
+                    className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 cursor-pointer" 
+                    aria-label="Edit skills"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                }
+              >
                 <div className="flex flex-wrap gap-2">
                   {skills.length > 0 ? (
                     skills.map((skill, index) => (
@@ -516,6 +548,24 @@ function SectionCard({ title, children, action }) {
         onClose={handleDrawerClose}
         profile={profile}
         onSave={handleSaveSummary}
+        token={token}
+      />
+
+      <JobSearchStatusDrawer
+        isOpen={openDrawer === 'jobSearch'}
+        onClose={handleDrawerClose}
+        profile={profile}
+        user={user}
+        onSave={handleSaveJobSearchStatus}
+        token={token}
+      />
+
+      <SkillsDrawer
+        isOpen={openDrawer === 'skills'}
+        onClose={handleDrawerClose}
+        profile={profile}
+        user={user}
+        onSave={handleSaveSkills}
         token={token}
       />
 

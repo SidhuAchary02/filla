@@ -78,6 +78,7 @@ class PersonalInfoRequest(BaseModel):
     address: Optional[str] = None
     address_2: Optional[str] = None
     address_3: Optional[str] = None
+    job_search_timeline: Optional[str] = None
     location: Optional[LocationModel] = None
 
 class OnboardingResponse(BaseModel):
