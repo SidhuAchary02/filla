@@ -7,13 +7,16 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 def ensure_profile_exists(user_id: str):
-    # Explicitly select all columns including personal info fields
+    # Explicitly select all columns including personal info fields and compensation fields
     response = supabase_client.table("user_profiles").select(
         "id,user_id,job_search_timeline,location,resume_url,"
+        "current_ctc,min_salary,notice_period,"
         "first_name,middle_name,last_name,preferred_name,suffix_name,"
         "phone,birthday,address,address_2,address_3,"
         "experience_level,role,work_experience,education,projects,"
-        "links,skills,languages,min_salary,onboarding_completed,"
+        "links,skills,languages,onboarding_completed,"
+        "ethnicity,work_authorized_us,work_authorized_canada,work_authorized_uk,"
+        "sponsorship_required,disability,lgbtq,gender,veteran,"
         "created_at,updated_at"
     ).eq("user_id", user_id).limit(1).execute()
     if response.data and len(response.data) > 0:
@@ -24,6 +27,9 @@ def ensure_profile_exists(user_id: str):
         "job_search_timeline": None,
         "location": None,
         "resume_url": None,
+        "current_ctc": None,
+        "min_salary": None,
+        "notice_period": None,
         "experience_level": None,
         "role": None,
         "work_experience": [],
@@ -32,7 +38,6 @@ def ensure_profile_exists(user_id: str):
         "links": None,
         "skills": [],
         "languages": [],
-        "min_salary": None,
         "onboarding_completed": False,
     }).execute()
 
@@ -41,10 +46,13 @@ def ensure_profile_exists(user_id: str):
 
     response = supabase_client.table("user_profiles").select(
         "id,user_id,job_search_timeline,location,resume_url,"
+        "current_ctc,min_salary,notice_period,"
         "first_name,middle_name,last_name,preferred_name,suffix_name,"
         "phone,birthday,address,address_2,address_3,"
         "experience_level,role,work_experience,education,projects,"
-        "links,skills,languages,min_salary,onboarding_completed,"
+        "links,skills,languages,onboarding_completed,"
+        "ethnicity,work_authorized_us,work_authorized_canada,work_authorized_uk,"
+        "sponsorship_required,disability,lgbtq,gender,veteran,"
         "created_at,updated_at"
     ).eq("user_id", user_id).limit(1).execute()
     if response.data and len(response.data) > 0:
@@ -188,6 +196,9 @@ async def get_current_user(authorization: str = Header(None)):
             job_search_timeline=profile_data.get("job_search_timeline"),
             location=profile_data.get("location"),
             resume_url=profile_data.get("resume_url"),
+            current_ctc=profile_data.get("current_ctc"),
+            min_salary=profile_data.get("min_salary"),
+            notice_period=profile_data.get("notice_period"),
             first_name=profile_data.get("first_name"),
             middle_name=profile_data.get("middle_name"),
             last_name=profile_data.get("last_name"),
@@ -198,6 +209,15 @@ async def get_current_user(authorization: str = Header(None)):
             address=profile_data.get("address"),
             address_2=profile_data.get("address_2"),
             address_3=profile_data.get("address_3"),
+            ethnicity=profile_data.get("ethnicity"),
+            work_authorized_us=profile_data.get("work_authorized_us"),
+            work_authorized_canada=profile_data.get("work_authorized_canada"),
+            work_authorized_uk=profile_data.get("work_authorized_uk"),
+            sponsorship_required=profile_data.get("sponsorship_required"),
+            disability=profile_data.get("disability"),
+            lgbtq=profile_data.get("lgbtq"),
+            gender=profile_data.get("gender"),
+            veteran=profile_data.get("veteran"),
             experience_level=profile_data.get("experience_level"),
             role=profile_data.get("role"),
             work_experience=profile_data.get("work_experience") or [],
@@ -206,7 +226,6 @@ async def get_current_user(authorization: str = Header(None)):
             links=profile_data.get("links"),
             skills=profile_data.get("skills") or [],
             languages=profile_data.get("languages") or [],
-            min_salary=profile_data.get("min_salary"),
             onboarding_completed=profile_data.get("onboarding_completed", False),
             created_at=profile_data["created_at"],
             updated_at=profile_data["updated_at"],

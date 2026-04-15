@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/useAuth'
 import { useNavigate } from 'react-router-dom'
-import { Pencil } from 'lucide-react'
+import { Gem, Pencil, ExternalLink } from 'lucide-react'
 import { logout as logoutService, getUserProfile } from '../lib/authService'
 import PersonalInfoDrawer from './drawers/PersonalInfoDrawer'
 import EmploymentInfoDrawer from './drawers/EmploymentInfoDrawer'
@@ -13,6 +13,7 @@ import EducationDrawer from './drawers/EducationDrawer'
 import WorkExperienceDrawer from './drawers/WorkExperienceDrawer'
 import ProjectsDrawer from './drawers/ProjectsDrawer'
 import LinksDrawer from './drawers/LinksDrawer'
+import CompensationDrawer from './drawers/CompensationDrawer'
 
 const menuItems = [
   { label: 'Profile', subtitle: 'Edit autofill information', emoji: '✏️' },
@@ -198,6 +199,11 @@ function Dashboard() {
     console.log('Links saved successfully')
   }
 
+  const handleSaveCompensation = async (formData) => {
+    // Profile will be updated via API in CompensationDrawer
+    console.log('Compensation info saved successfully')
+  }
+
   console.log('first', user)
 
   const displayName = getDisplayName(profile, user?.email)
@@ -234,15 +240,13 @@ function Dashboard() {
             </div>
 
             <nav className="hidden items-center gap-5 text-sm text-slate-600 lg:flex">
-              {floatingSections.map(section => (
                 <button
-                  key={section.label}
+                  key="home"
                   type="button"
-                  className={`transition hover:text-slate-900 ${section.active ? 'font-medium text-slate-900' : ''}`}
+                  className={`transition text-slate-900`}
                 >
-                  {section.label}
+                  Home
                 </button>
-              ))}
             </nav>
           </div>
 
@@ -342,7 +346,7 @@ function Dashboard() {
                   <p className="text-sm font-semibold text-slate-900">Upgrade to Premium</p>
                   <h4 className="mt-1 text-lg font-bold text-slate-900">filla+ <span className="text-xs font-medium text-slate-500">Beta</span></h4>
                 </div>
-                <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-cyan-600 shadow-sm">◔</span>
+                <Gem size={16} />
               </div>
 
               <p className="text-sm text-slate-700">Supercharge your job search with filla&apos;s AI features.</p>
@@ -652,6 +656,69 @@ function Dashboard() {
                 </div>
               </SectionCard>
             </div>
+
+            <SectionCard
+              title="Compensation & Resume"
+              action={
+                <button
+                  type="button"
+                  onClick={() => handleDrawerOpen('compensation')}
+                  className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
+                  aria-label="Edit compensation and resume"
+                >
+                  <Pencil size={16} />
+                </button>
+              }
+            >
+              <div className="space-y-4">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Current CTC</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-900">
+                    {displayProfile.current_ctc 
+                      ? `₹${Number(displayProfile.current_ctc).toLocaleString('en-IN')}` 
+                      : <span className="text-slate-400">-</span>
+                    }
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Expected Minimum Salary</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-900">
+                    {displayProfile.min_salary 
+                      ? `₹${Number(displayProfile.min_salary).toLocaleString('en-IN')}` 
+                      : <span className="text-slate-400">-</span>
+                    }
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Notice Period</p>
+                  <p className="mt-2 text-sm text-slate-900">
+                    {displayProfile.notice_period 
+                      ? displayProfile.notice_period 
+                      : <span className="text-slate-400">-</span>
+                    }
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Resume</p>
+                  {displayProfile.resume_url ? (
+                    <a
+                      href={displayProfile.resume_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-cyan-600 hover:text-cyan-700 hover:underline"
+                    >
+                      View Resume
+                      <ExternalLink size={14} />
+                    </a>
+                  ) : (
+                    <p className="mt-2 text-sm text-slate-500">No resume added</p>
+                  )}
+                </div>
+              </div>
+            </SectionCard>
           </section>
         </div>
       </main>
@@ -739,12 +806,13 @@ function Dashboard() {
         token={token}
       />
 
-      <button
-        type="button"
-        className="fixed bottom-6 right-6 rounded-full bg-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-cyan-600"
-      >
-        + Feedback
-      </button>
+      <CompensationDrawer
+        isOpen={openDrawer === 'compensation'}
+        onClose={handleDrawerClose}
+        profile={profile}
+        onSave={handleSaveCompensation}
+        token={token}
+      />
     </div>
   )
 }

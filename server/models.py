@@ -80,6 +80,10 @@ class PersonalInfoRequest(BaseModel):
     address_3: Optional[str] = None
     job_search_timeline: Optional[str] = None
     location: Optional[LocationModel] = None
+    resume_url: Optional[str] = None
+    current_ctc: Optional[float] = None
+    min_salary: Optional[float] = None
+    notice_period: Optional[str] = None
     skills: Optional[List[str]] = None  # List of skill names
     languages: Optional[List[str]] = None  # List of language names
     education: Optional[List[dict]] = None  # List of education objects
@@ -102,6 +106,9 @@ class OnboardingResponse(BaseModel):
     job_search_timeline: Optional[str]
     location: Optional[dict]
     resume_url: Optional[str]
+    current_ctc: Optional[float] = None
+    min_salary: Optional[float] = None
+    notice_period: Optional[str] = None
     # Personal Information
     first_name: Optional[str] = None
     middle_name: Optional[str] = None
@@ -132,7 +139,6 @@ class OnboardingResponse(BaseModel):
     links: Optional[dict]
     skills: List[str]
     languages: List[str]
-    min_salary: Optional[float]
     onboarding_completed: bool
     created_at: datetime
     updated_at: datetime
@@ -147,6 +153,9 @@ class UserProfileResponse(BaseModel):
     job_search_timeline: Optional[str]
     location: Optional[dict]
     resume_url: Optional[str]
+    current_ctc: Optional[float] = None
+    min_salary: Optional[float] = None
+    notice_period: Optional[str] = None
     # Personal Information
     first_name: Optional[str] = None
     middle_name: Optional[str] = None
@@ -177,7 +186,6 @@ class UserProfileResponse(BaseModel):
     links: Optional[dict]
     skills: List[str]
     languages: List[str]
-    min_salary: Optional[float]
     onboarding_completed: bool
     created_at: datetime
     updated_at: datetime

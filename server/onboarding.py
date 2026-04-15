@@ -46,6 +46,9 @@ def _serialize_profile(profile: dict) -> OnboardingResponse:
         job_search_timeline=profile.get("job_search_timeline"),
         location=profile.get("location"),
         resume_url=profile.get("resume_url"),
+        current_ctc=profile.get("current_ctc"),
+        min_salary=profile.get("min_salary"),
+        notice_period=profile.get("notice_period"),
         first_name=profile.get("first_name"),
         middle_name=profile.get("middle_name"),
         last_name=profile.get("last_name"),
@@ -73,7 +76,6 @@ def _serialize_profile(profile: dict) -> OnboardingResponse:
         links=profile.get("links"),
         skills=profile.get("skills") or [],
         languages=profile.get("languages") or [],
-        min_salary=profile.get("min_salary"),
         onboarding_completed=profile.get("onboarding_completed", False),
         created_at=profile["created_at"],
         updated_at=profile["updated_at"]
@@ -84,10 +86,11 @@ def _get_profile_by_user_id(user_id: str):
     # Explicitly select all columns including personal info and employment info fields
     response = supabase_client.table("user_profiles").select(
         "id,user_id,job_search_timeline,location,resume_url,"
+        "current_ctc,min_salary,notice_period,"
         "first_name,middle_name,last_name,preferred_name,suffix_name,"
         "phone,birthday,address,address_2,address_3,"
         "experience_level,role,work_experience,education,projects,"
-        "links,skills,languages,min_salary,onboarding_completed,"
+        "links,skills,languages,onboarding_completed,"
         "ethnicity,work_authorized_us,work_authorized_canada,work_authorized_uk,"
         "sponsorship_required,disability,lgbtq,gender,veteran,"
         "created_at,updated_at"
@@ -296,8 +299,14 @@ async def update_personal_info(
             payload["gender"] = request.gender
         if request.veteran is not None:
             payload["veteran"] = request.veteran
-
-        print(f"🔧 Update payload for user {user_id}: {payload}")
+        if request.resume_url is not None:
+            payload["resume_url"] = request.resume_url
+        if request.current_ctc is not None:
+            payload["current_ctc"] = request.current_ctc
+        if request.min_salary is not None:
+            payload["min_salary"] = request.min_salary
+        if request.notice_period is not None:
+            payload["notice_period"] = request.notice_period
         
         try:
             # Try update via Supabase SDK
