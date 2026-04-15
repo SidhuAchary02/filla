@@ -255,6 +255,8 @@ async def update_personal_info(
             payload["job_search_timeline"] = request.job_search_timeline
         if request.location is not None:
             payload["location"] = _to_dict(request.location)
+        if request.skills is not None:
+            payload["skills"] = request.skills
 
         print(f"🔧 Update payload for user {user_id}: {payload}")
         
@@ -278,6 +280,12 @@ async def update_personal_info(
             print(f"   - job_search_timeline in DB: {profile.get('job_search_timeline')}")
             print(f"   - Expected: {payload.get('job_search_timeline', 'N/A')}")
             print(f"   - Match: {profile.get('job_search_timeline') == payload.get('job_search_timeline')}")
+            if request.skills is not None:
+                print(f"   - skills in DB: {profile.get('skills')}")
+                print(f"   - Expected skills: {payload.get('skills', 'N/A')}")
+                print(f"   - Skills type in DB: {type(profile.get('skills'))}")
+                print(f"   - Skills type expected: {type(payload.get('skills'))}")
+                print(f"   - Skills match: {profile.get('skills') == payload.get('skills')}")
         else:
             print(f"❌ NO PROFILE FOUND after update!")
             raise HTTPException(

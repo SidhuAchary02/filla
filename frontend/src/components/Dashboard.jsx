@@ -564,7 +564,6 @@ function SectionCard({ title, children, action }) {
         isOpen={openDrawer === 'skills'}
         onClose={handleDrawerClose}
         profile={profile}
-        user={user}
         onSave={handleSaveSkills}
         token={token}
       />

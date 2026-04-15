@@ -39,6 +39,7 @@ export default function SkillsInput({
   onChange,
   placeholder = 'Search or add a skill',
   className = '',
+  disabled = false,
 }) {
   const wrapperRef = useRef(null)
   const [query, setQuery] = useState('')
@@ -120,7 +121,8 @@ export default function SkillsInput({
               <button
                 type="button"
                 onClick={() => removeSkill(skill.normalized)}
-                className="rounded-full text-blue-500 transition hover:text-blue-700"
+                disabled={disabled}
+                className="rounded-full text-blue-500 transition hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label={`Remove ${skill.name}`}
               >
                 ×
@@ -138,7 +140,8 @@ export default function SkillsInput({
             onFocus={() => setOpen(true)}
             onKeyDown={handleKeyDown}
             placeholder={selectedSkills.length ? '' : placeholder}
-            className="min-w-[180px] flex-1 border-0 p-0 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-0"
+            disabled={disabled}
+            className="min-w-[180px] flex-1 border-0 p-0 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-0 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
           />
         </div>
       </div>

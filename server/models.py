@@ -80,6 +80,7 @@ class PersonalInfoRequest(BaseModel):
     address_3: Optional[str] = None
     job_search_timeline: Optional[str] = None
     location: Optional[LocationModel] = None
+    skills: Optional[List[str]] = None  # List of skill names
 
 class OnboardingResponse(BaseModel):
     id: str

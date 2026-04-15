@@ -3,11 +3,8 @@ import Drawer from '../Drawer'
 import SkillsInput from '../SkillsInput'
 import { updateUserProfile, getUserProfile } from '../../lib/authService'
 
-function SkillsDrawer({ isOpen, onClose, profile, user, onSave, token }) {
-  const [formData, setFormData] = useState({
-    skills: [],
-  })
-
+function SkillsDrawer({ isOpen, onClose, profile, onSave, token }) {
+  const [skills, setSkills] = useState([])
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -19,37 +16,25 @@ function SkillsDrawer({ isOpen, onClose, profile, user, onSave, token }) {
       setIsLoading(true)
       getUserProfile(token)
         .then(freshProfile => {
-          console.log('Fresh profile fetched from server:', freshProfile)
-          populateForm(freshProfile)
+          console.log('Fresh profile fetched for skills:', freshProfile)
+          const currentSkills = Array.isArray(freshProfile?.skills) ? freshProfile.skills : []
+          setSkills(currentSkills)
+          setError('')
+          setSuccess('')
         })
         .catch(err => {
-          console.error('Error fetching profile:', err)
-          if (profile) {
-            populateForm(profile)
+          console.error('Error fetching profile for skills:', err)
+          // Fall back to prop profile if fetch fails
+          if (profile?.skills) {
+            setSkills(Array.isArray(profile.skills) ? profile.skills : [])
           }
         })
         .finally(() => setIsLoading(false))
     }
   }, [isOpen, token])
 
-  const populateForm = (profileData) => {
-    if (!profileData) return
-
-    const formDataToSet = {
-      skills: Array.isArray(profileData?.skills) ? profileData.skills : [],
-    }
-
-    console.log('Populating form with:', formDataToSet)
-    setFormData(formDataToSet)
-    setError('')
-    setSuccess('')
-  }
-
-  const handleSkillsChange = (skills) => {
-    setFormData(prev => ({
-      ...prev,
-      skills: skills || [],
-    }))
+  const handleSkillsChange = (newSkills) => {
+    setSkills(newSkills)
   }
 
   const handleSave = async (e) => {
@@ -59,16 +44,22 @@ function SkillsDrawer({ isOpen, onClose, profile, user, onSave, token }) {
     setSuccess('')
 
     try {
+      // Transform skills from objects to just names
+      const skillNames = skills.map(skill => 
+        typeof skill === 'string' ? skill : skill.name
+      )
+
+      // Structure data to match API schema
       const updateData = {
-        skills: formData.skills || [],
+        skills: skillNames || [],
       }
 
-      console.log('Saving skills:', updateData)
+      console.log('📌 Saving skills:', updateData)
 
       // Call API
       if (token) {
         const response = await updateUserProfile(updateData, token)
-        console.log('API Response:', response)
+        console.log('📌 Skills update response:', response)
       }
 
       // Call parent onSave callback if provided
@@ -77,22 +68,31 @@ function SkillsDrawer({ isOpen, onClose, profile, user, onSave, token }) {
       }
 
       setSuccess('Skills updated successfully!')
-
-      // Refetch profile to get updated data
-      setTimeout(async () => {
-        try {
-          const freshProfile = await getUserProfile(token)
-          console.log('Fresh profile after save:', freshProfile)
-          populateForm(freshProfile)
-        } catch (err) {
-          console.error('Error refetching profile:', err)
-        }
-
-        // Close drawer after a short delay
+      
+      // Refetch profile to verify update
+      if (token) {
+        setTimeout(async () => {
+          try {
+            const freshProfile = await getUserProfile(token)
+            console.log('📌 Fresh profile after save:', freshProfile)
+            const currentSkills = Array.isArray(freshProfile?.skills) ? freshProfile.skills : []
+            setSkills(currentSkills)
+            
+            setTimeout(() => {
+              onClose()
+            }, 500)
+          } catch (err) {
+            console.error('Error refetching profile:', err)
+            setTimeout(() => {
+              onClose()
+            }, 1500)
+          }
+        }, 500)
+      } else {
         setTimeout(() => {
           onClose()
-        }, 500)
-      }, 1000)
+        }, 1500)
+      }
     } catch (error) {
       console.error('Error saving skills:', error)
       setError(error.message || 'Failed to save skills')
@@ -107,7 +107,7 @@ function SkillsDrawer({ isOpen, onClose, profile, user, onSave, token }) {
         {/* Loading Message */}
         {isLoading && (
           <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-700 border border-blue-200">
-            Loading your information...
+            Loading your skills...
           </div>
         )}
 
@@ -125,42 +125,36 @@ function SkillsDrawer({ isOpen, onClose, profile, user, onSave, token }) {
           </div>
         )}
 
-        {/* Current Profile Display */}
-        <div className="rounded-lg bg-slate-50 p-4 border border-slate-200">
-          <p className="text-xs uppercase tracking-wide text-slate-500 font-medium mb-3">Your Profile</p>
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-slate-900">
-              {user?.profile?.first_name} {user?.profile?.last_name}
-            </p>
-            <p className="text-xs text-slate-600">{user?.email}</p>
+        {/* Info Message */}
+        {skills.length === 0 && (
+          <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-700 border border-amber-200">
+            💡 Start adding skills to your profile. Search from our database or add custom skills.
           </div>
-        </div>
+        )}
 
-        {/* Skills Input Section */}
-        <div className="space-y-2">
-          <label htmlFor="skills" className="block text-sm font-medium text-slate-700">
-            Technical Skills
+        {/* Skills Section */}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-3">
+            Your Skills ({skills.length})
           </label>
           <SkillsInput
-            value={formData.skills}
+            value={skills}
             onChange={handleSkillsChange}
-            placeholder="Search skills or add your own"
-            className="w-full"
+            placeholder="Search or add a skill"
+            disabled={isLoading || isSaving}
           />
-          <p className="text-xs text-slate-500">
-            Search from our curated list or add custom skills
+          <p className="mt-2 text-xs text-slate-500">
+            Type to search skills or press Enter to add a custom skill
           </p>
         </div>
 
         {/* Current Skills Display */}
-        {formData.skills && formData.skills.length > 0 && (
-          <div className="rounded-lg bg-blue-50 p-4 border border-blue-200">
-            <p className="text-xs uppercase tracking-wide text-blue-600 font-medium mb-2">
-              {formData.skills.length} skill{formData.skills.length !== 1 ? 's' : ''} selected
-            </p>
+        {skills.length > 0 && (
+          <div className="rounded-lg bg-slate-50 p-4 border border-slate-200">
+            <p className="text-sm font-medium text-slate-700 mb-2">Current Skills:</p>
             <div className="flex flex-wrap gap-2">
-              {formData.skills.map((skill, index) => {
-                const skillName = typeof skill === 'string' ? skill : skill?.name || skill
+              {skills.map((skill, index) => {
+                const skillName = typeof skill === 'string' ? skill : skill.name
                 return (
                   <span
                     key={`${skillName}-${index}`}
@@ -175,18 +169,19 @@ function SkillsDrawer({ isOpen, onClose, profile, user, onSave, token }) {
         )}
 
         {/* Action Buttons */}
-        <div className="flex gap-3 pt-4 border-t border-slate-200">
+        <div className="flex gap-3 pt-4">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            disabled={isSaving}
+            className="flex-1 px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
           <button
             type="submit"
-            disabled={isSaving}
-            className="flex-1 rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isSaving || isLoading}
+            className="flex-1 px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium transition hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSaving ? 'Saving...' : 'Save Changes'}
           </button>

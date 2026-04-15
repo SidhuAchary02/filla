@@ -9,6 +9,7 @@ const skillsData = [
   { "name": "C++", "normalized": "cpp" },
   { "name": "Go", "normalized": "go" },
   { "name": "Rust", "normalized": "rust" },
+  { "name": "PostgreSQL", "normalized": "postgresql" },
   { "name": "Swift", "normalized": "swift" },
   { "name": "Kotlin", "normalized": "kotlin" },
   { "name": "Docker", "normalized": "docker" },
