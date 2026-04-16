@@ -231,23 +231,8 @@ function Dashboard() {
         <div className="mx-auto flex h-16 max-w-370 items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-cyan-500 text-white shadow-sm">
-                <span className="text-sm font-bold">≋</span>
-              </div>
-              <div>
-                <p className="text-lg font-bold tracking-tight text-slate-900">filla</p>
-              </div>
+              <img src="./logo.png" width={45} alt="" />
             </div>
-
-            <nav className="hidden items-center gap-5 text-sm text-slate-600 lg:flex">
-                <button
-                  key="home"
-                  type="button"
-                  className={`transition text-slate-900`}
-                >
-                  Home
-                </button>
-            </nav>
           </div>
 
           <div className="flex items-center gap-3 text-sm text-slate-500">
@@ -317,7 +302,7 @@ function Dashboard() {
               </div>
             </section> */}
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            {/* <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="mb-4">
                 <p className="text-sm font-semibold text-slate-900">My Profile Strength</p>
                 <p className="mt-1 text-sm text-slate-500">Career Newbie</p>
@@ -337,6 +322,68 @@ function Dashboard() {
                     <span className="ml-auto text-xs text-cyan-600">+10%</span>
                   </div>
                 ))}
+              </div>
+            </section> */}
+
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-base font-semibold text-slate-900">Compensation & Resume</h3>
+                <button
+                  type="button"
+                  onClick={() => handleDrawerOpen('compensation')}
+                  className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
+                  aria-label="Edit compensation and resume"
+                >
+                  <Pencil size={16} />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Current CTC</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {displayProfile.current_ctc
+                      ? `₹${Number(displayProfile.current_ctc).toLocaleString('en-IN')}`
+                      : <span className="text-slate-400">-</span>
+                    }
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Expected Min Salary</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {displayProfile.min_salary
+                      ? `₹${Number(displayProfile.min_salary).toLocaleString('en-IN')}`
+                      : <span className="text-slate-400">-</span>
+                    }
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Notice Period</p>
+                  <p className="mt-1 text-sm text-slate-900">
+                    {displayProfile.notice_period
+                      ? displayProfile.notice_period
+                      : <span className="text-slate-400">-</span>
+                    }
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Resume</p>
+                  {displayProfile.resume_url ? (
+                    <a
+                      href={displayProfile.resume_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-cyan-600 hover:text-cyan-700 hover:underline"
+                    >
+                      View Resume
+                      <ExternalLink size={12} />
+                    </a>
+                  ) : (
+                    <p className="mt-1 text-xs text-slate-500">No resume added</p>
+                  )}
+                </div>
               </div>
             </section>
 
@@ -602,7 +649,7 @@ function Dashboard() {
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <p className="flex items-center gap-1 font-medium text-slate-900">
                       <img src="./linkedin.png" alt="linkedin" width={16} />
-                       LinkedIn
+                      LinkedIn
                     </p>
                     {links.linkedin ? (
                       <a
@@ -620,7 +667,7 @@ function Dashboard() {
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <p className="flex items-center gap-1 font-medium text-slate-900">
                       <img src="./github.png" alt="github" width={16} />
-                       GitHub
+                      GitHub
                     </p>
                     {links.github ? (
                       <a
@@ -638,7 +685,7 @@ function Dashboard() {
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <p className="flex items-center gap-1 font-medium text-slate-900">
                       <img src="./globe.png" alt="portfolio" width={16} />
-                       Portfolio
+                      Portfolio
                     </p>
                     {links.portfolio ? (
                       <a
@@ -656,69 +703,6 @@ function Dashboard() {
                 </div>
               </SectionCard>
             </div>
-
-            <SectionCard
-              title="Compensation & Resume"
-              action={
-                <button
-                  type="button"
-                  onClick={() => handleDrawerOpen('compensation')}
-                  className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
-                  aria-label="Edit compensation and resume"
-                >
-                  <Pencil size={16} />
-                </button>
-              }
-            >
-              <div className="space-y-4">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Current CTC</p>
-                  <p className="mt-2 text-sm font-semibold text-slate-900">
-                    {displayProfile.current_ctc 
-                      ? `₹${Number(displayProfile.current_ctc).toLocaleString('en-IN')}` 
-                      : <span className="text-slate-400">-</span>
-                    }
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Expected Minimum Salary</p>
-                  <p className="mt-2 text-sm font-semibold text-slate-900">
-                    {displayProfile.min_salary 
-                      ? `₹${Number(displayProfile.min_salary).toLocaleString('en-IN')}` 
-                      : <span className="text-slate-400">-</span>
-                    }
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Notice Period</p>
-                  <p className="mt-2 text-sm text-slate-900">
-                    {displayProfile.notice_period 
-                      ? displayProfile.notice_period 
-                      : <span className="text-slate-400">-</span>
-                    }
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Resume</p>
-                  {displayProfile.resume_url ? (
-                    <a
-                      href={displayProfile.resume_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-cyan-600 hover:text-cyan-700 hover:underline"
-                    >
-                      View Resume
-                      <ExternalLink size={14} />
-                    </a>
-                  ) : (
-                    <p className="mt-2 text-sm text-slate-500">No resume added</p>
-                  )}
-                </div>
-              </div>
-            </SectionCard>
           </section>
         </div>
       </main>
@@ -816,6 +800,5 @@ function Dashboard() {
     </div>
   )
 }
-
 
 export default Dashboard
