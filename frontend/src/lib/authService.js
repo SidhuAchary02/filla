@@ -1,25 +1,19 @@
+import { setCookie, removeCookie, getCookie, clearAuthCookies } from './cookieUtils'
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
-const FOUR_DAYS_IN_MS = 4 * 24 * 60 * 60 * 1000
+const FOUR_DAYS_IN_SECONDS = 4 * 24 * 60 * 60
 
 function persistAuthSession(accessToken, userId, rememberMe = true) {
   if (rememberMe) {
-    localStorage.setItem('auth_token', accessToken)
-    localStorage.setItem('user_id', userId)
-    sessionStorage.removeItem('auth_token')
-    sessionStorage.removeItem('user_id')
+    // Set persistent cookies (4 days)
+    setCookie('auth_token', accessToken, { maxAge: FOUR_DAYS_IN_SECONDS })
+    setCookie('user_id', userId, { maxAge: FOUR_DAYS_IN_SECONDS })
+    const expiry = Date.now() + (FOUR_DAYS_IN_SECONDS * 1000)
+    setCookie('auth_expiry', expiry.toString(), { maxAge: FOUR_DAYS_IN_SECONDS })
   } else {
-    sessionStorage.setItem('auth_token', accessToken)
-    sessionStorage.setItem('user_id', userId)
-    localStorage.removeItem('auth_token')
-    localStorage.removeItem('user_id')
-    localStorage.removeItem('auth_expiry')
-  }
-
-  if (rememberMe) {
-    const expiry = Date.now() + FOUR_DAYS_IN_MS
-    localStorage.setItem('auth_expiry', expiry.toString())
-  } else {
-    localStorage.removeItem('auth_expiry')
+    // Set session-only cookies (browser session)
+    setCookie('auth_token', accessToken)
+    setCookie('user_id', userId)
   }
 }
 
@@ -232,9 +226,5 @@ export async function updateUserProfile(data, token) {
 
 // ============ LOGOUT ============
 export function logout() {
-  localStorage.removeItem('auth_token')
-  localStorage.removeItem('user_id')
-  localStorage.removeItem('auth_expiry')
-  sessionStorage.removeItem('auth_token')
-  sessionStorage.removeItem('user_id')
+  clearAuthCookies()
 }

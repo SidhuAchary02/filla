@@ -138,7 +138,7 @@
     return path.join(" > ");
   }
 
-  function performAutofill(autofillData) {
+  function performAutofill(profile) {
     const results = {
       filled: 0,
       skipped: 0,
@@ -146,43 +146,66 @@
       details: []
     };
 
-    // Match fields by question/type and fill them
-    Object.entries(autofillData).forEach(([key, value]) => {
-      const fields = document.querySelectorAll("input, textarea, select");
+    // Iterate over ALL DOM fields and fill using processQuestionV2
+    const fields = document.querySelectorAll("input, textarea, select");
 
-      for (const field of fields) {
-        const fieldQuestion = extractQuestion(field);
-        const fieldType = getFieldType(field);
+    fields.forEach((field) => {
+      const question = extractQuestion(field);
+      const fieldType = getFieldType(field);
 
-        // Match by exact question or key
-        const matches =
-          fieldQuestion.toLowerCase() === key.toLowerCase() ||
-          field.name === key ||
-          field.id === key;
+      // Skip if field is not visible or capable
+      if (!isAutofillCapable(field)) {
+        return;
+      }
 
-        if (matches && value !== null && value !== undefined) {
-          try {
-            fillField(field, value, fieldType);
-            results.filled += 1;
-            results.details.push({
-              question: fieldQuestion,
-              type: fieldType,
-              status: "filled"
-            });
-          } catch (err) {
-            results.failed += 1;
-            results.details.push({
-              question: fieldQuestion,
-              type: fieldType,
-              status: "failed",
-              error: err.message
-            });
-          }
+      // Use processQuestionV2 to get the value for this question
+      if (typeof processQuestionV2 !== 'undefined') {
+        const result = processQuestionV2(question, profile);
+
+        if (!result.matched || result.value === null) {
+          results.skipped += 1;
+          results.details.push({
+            question: question,
+            type: fieldType,
+            status: "skipped",
+            reason: result.reason
+          });
+          return;
         }
+
+        try {
+          fillField(field, result.value, fieldType);
+          results.filled += 1;
+          results.details.push({
+            question: question,
+            type: fieldType,
+            status: "filled",
+            value: String(result.value).substring(0, 50)
+          });
+          console.log(`[Filla] ✓ Filled: "${question}" → ${result.value}`);
+        } catch (err) {
+          results.failed += 1;
+          results.details.push({
+            question: question,
+            type: fieldType,
+            status: "failed",
+            error: err.message
+          });
+          console.error(`[Filla] ✗ Failed to fill: "${question}"`, err);
+        }
+      } else {
+        results.failed += 1;
+        results.details.push({
+          question: question,
+          type: fieldType,
+          status: "failed",
+          error: "processQuestionV2 not available"
+        });
+        console.warn("[Filla] processQuestionV2 function not found - ensure autofill-engine-v2.js is loaded");
       }
     });
 
-    console.log("Autofill Results:", results);
+    console.log("[Filla] Autofill Results:", results);
     return results;
   }
 

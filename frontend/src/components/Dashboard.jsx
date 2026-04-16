@@ -96,8 +96,9 @@ function SectionCard({ title, children, action }) {
 }
 
 function Dashboard() {
-  const { user, logout } = useAuth()
+  const { user, logout, getToken } = useAuth()
   const navigate = useNavigate()
+  const token = getToken()
   const profile = user?.profile || {}
   const skills = Array.isArray(profile.skills) ? profile.skills : []
   const workExperience = Array.isArray(profile.work_experience) ? profile.work_experience : []
@@ -106,9 +107,6 @@ function Dashboard() {
   const languages = Array.isArray(profile.languages) ? profile.languages : []
   const location = profile.location || {}
   const links = profile.links || {}
-
-  // Get auth token
-  const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
 
   // Drawer state
   const [openDrawer, setOpenDrawer] = useState(null)
@@ -231,7 +229,9 @@ function Dashboard() {
         <div className="mx-auto flex h-16 max-w-370 items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-2">
-              <img src="./logo.png" width={45} alt="" />
+              <a href="/">
+                <img src="./logo.png" width={45} alt="Filla Logo" />
+              </a>
             </div>
           </div>
 

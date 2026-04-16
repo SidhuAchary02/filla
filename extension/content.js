@@ -779,7 +779,21 @@
       // e.g., "How many years with Python?" → look for skill containing "python"
       for (const skill of skills) {
         const skillName = String(skill.name || skill).toLowerCase();
-        if (q.includes(skillName) && skill.experience) {
+        const skillNormalized = String(skill.normalized || '').toLowerCase();
+        
+        // Normalize for flexible matching (spaces/underscores)
+        const skillNameNorm = skillName.replace(/[\s_-]/g, ' ').trim();
+        const skillNormalizedNorm = skillNormalized.replace(/[\s_-]/g, ' ').trim();
+        const qNorm = q.replace(/[\s_-]/g, ' ').trim();
+        
+        // Check all variations
+        const matches = 
+          qNorm.includes(skillNameNorm) || 
+          qNorm.includes(skillName) ||
+          qNorm.includes(skillNormalized) ||
+          qNorm.includes(skillNormalizedNorm);
+        
+        if (matches && skill.experience) {
           return { type: 'personal', key: 'skill_experience', value: skill.experience };
         }
       }

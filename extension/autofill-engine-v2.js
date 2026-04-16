@@ -348,23 +348,25 @@ function handleNonTechQuestion(question, profile) {
   }
 
   // Specific skill experience: "How many years with [SkillName]?"
-  // Check user's actual skills list first, before trying generic categories
+  // STANDARD APPROACH: Check question text against user's actual skills
   if ((q.includes('years') || q.includes('experience')) && q.includes('with')) {
     const skills = profile.skills || [];
     
     if (Array.isArray(skills) && skills.length > 0) {
+      // For each skill, check if it's mentioned in the question
       for (const skill of skills) {
-        const skillName = String(skill.name || skill).toLowerCase();
-        const skillNormalized = String(skill.normalized || '').toLowerCase();
+        if (!skill || !skill.name) continue;
         
-        // Check if question mentions this skill (exact name or normalized version)
-        if (q.includes(skillName) || q.includes(skillNormalized)) {
-          // For skill objects with experience field
-          if (typeof skill === 'object' && skill.experience !== null && skill.experience !== undefined) {
+        const skillName = String(skill.name).toLowerCase();
+        
+        // Direct substring match: if skill name appears in question, use it
+        // "Generative AI" → question contains "generative ai" → match!
+        if (q.includes(skillName)) {
+          if (skill.experience !== null && skill.experience !== undefined) {
             return { 
               value: skill.experience, 
               matched: true, 
-              reason: `Matched skill experience: ${skill.name}` 
+              reason: `Skill match: ${skill.name} = ${skill.experience} years` 
             };
           }
         }

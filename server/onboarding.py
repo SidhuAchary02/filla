@@ -145,11 +145,15 @@ def _compute_normalized_profile(profile: dict) -> dict:
         ...
       }
     }
+    
+    IMPORTANT: If a skill has an explicit 'experience' field, use that directly.
+    Only calculate from work_experience if experience is not explicitly set.
     """
     skills = profile.get("skills") or []
     work_experience = profile.get("work_experience") or []
     notice_period = profile.get("notice_period") or "immediate"
 
+    # Pass full skill dicts to normalize_profile so it can access explicit experience values
     normalized = normalize_profile(skills, work_experience)
     normalized["notice_period"] = notice_period
     return normalized
@@ -186,11 +190,11 @@ async def submit_onboarding(
         }
 
         # Compute normalized_profile from work_experience + skills
-        # Extract skill names for normalization
+        # Extract skill names for normalization (from dicts, not SkillModel objects)
         skills_for_normalization = [
-            skill.get("name") if isinstance(skill, dict) else skill.name 
-            for skill in request.skills
-        ] if request.skills else []
+            skill.get("name") 
+            for skill in payload["skills"]
+        ] if payload["skills"] else []
         
         profile_for_normalization = {
             "skills": skills_for_normalization,
@@ -356,19 +360,18 @@ async def update_personal_info(
             # Get current profile to fill in any missing fields
             current = _get_profile_by_user_id(user_id)
             
-            # Extract skill names from skill objects for normalization
+            # Convert skill objects to dicts for normalization (preserving experience field)
             skills_for_normalization = []
             if request.skills is not None:
+                # Convert SkillModel objects to dicts
                 skills_for_normalization = [
-                    skill.get("name") if isinstance(skill, dict) else skill.name 
+                    _to_dict(skill) if hasattr(skill, 'model_dump') else skill
                     for skill in request.skills
                 ]
             else:
+                # Use existing skills from current profile (already dicts)
                 current_skills = current.get("skills") or []
-                skills_for_normalization = [
-                    skill.get("name") if isinstance(skill, dict) else skill 
-                    for skill in current_skills
-                ]
+                skills_for_normalization = current_skills
             
             merged_profile = {
                 "skills": skills_for_normalization,

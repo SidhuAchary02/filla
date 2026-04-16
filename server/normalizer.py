@@ -197,7 +197,7 @@ def _skill_appears_in_work_history(skill_keywords: List[str], work_experience: L
 # ============================================================================
 
 def normalize_profile(
-    skills: Optional[List[str]] = None,
+    skills: Optional[List] = None,
     work_experience: Optional[List[Dict]] = None,
     education: Optional[List[Dict]] = None
 ) -> Dict:
@@ -205,7 +205,7 @@ def normalize_profile(
     Normalize raw profile data into structured experience breakdown.
     
     Args:
-        skills: List of skill names (e.g., ["Python", "React", "AWS"])
+        skills: List of skill names (strings) OR skill dicts with {name, normalized, experience}
         work_experience: List of work experience entries with title, company, description, dates
         education: List of education entries (not currently used, but included for future)
     
@@ -226,6 +226,10 @@ def normalize_profile(
             "version": 1
         }
     
+    PRIORITY:
+    1. If skill has explicit 'experience' field, use that directly
+    2. Otherwise, calculate from work_experience descriptions
+    
     This is stored as JSON in normalized_profile column.
     """
     
@@ -240,23 +244,62 @@ def normalize_profile(
         for category in SKILL_CATEGORY_MAP.keys()
     }
 
+    # Build map of skills for quick lookup
+    # Handle both string and dict formats
+    skill_dict_map = {}  # Maps skill name → {name, normalized, experience}
+    skill_names = []
+    
+    for skill in skills:
+        if isinstance(skill, dict):
+            name = skill.get("name", "")
+            if name:
+                skill_dict_map[_normalize_text(name)] = skill
+                skill_names.append(name)
+        else:
+            name = str(skill)
+            if name:
+                skill_dict_map[_normalize_text(name)] = {"name": name}
+                skill_names.append(name)
+
     # For each skill category, calculate total years
     for category, config in SKILL_CATEGORY_MAP.items():
         keywords = config.get("keywords", [])
 
-        # Check if this skill category appears in:
-        # 1. User's skills list
-        # 2. Work experience descriptions
-
-        # Match in skills list
+        # Check if this skill category appears in user's skills list
         skill_matched = any(
-            keyword in _normalize_text(" ".join(skills))
+            keyword in _normalize_text(" ".join(skill_names))
             for keyword in keywords
         )
 
-        # If skill is in list, also check work history to calculate duration
-        if skill_matched and work_experience:
-            # Calculate total months spent on jobs mentioning this skill
+        if not skill_matched:
+            continue
+
+        # PRIORITY 1: Check if any skill in this category has explicit experience
+        explicit_experience = None
+        for skill_name in skill_names:
+            skill_info = skill_dict_map.get(_normalize_text(skill_name), {})
+            skill_obj_name = skill_info.get("name", "")
+            
+            # Check if this skill belongs to this category
+            for keyword in keywords:
+                if keyword in _normalize_text(skill_obj_name):
+                    # This skill belongs to this category
+                    if "experience" in skill_info and skill_info["experience"] is not None:
+                        explicit_exp = skill_info["experience"]
+                        if isinstance(explicit_exp, (int, float)) and explicit_exp > 0:
+                            explicit_experience = explicit_exp
+                            break
+            
+            if explicit_experience is not None:
+                break
+
+        # If we found explicit experience, use it
+        if explicit_experience is not None:
+            experience_years[category] = float(explicit_experience)
+            continue
+
+        # PRIORITY 2: Calculate from work_experience descriptions
+        if work_experience:
             total_months = 0
 
             for exp in work_experience:

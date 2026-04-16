@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { submitOnboarding, getUserProfile } from '../lib/authService'
 import { useAuth } from '../lib/useAuth'
+import { getCookie, setCookie } from '../lib/cookieUtils'
 import { createSupabaseClientWithToken } from '../lib/supabaseClient'
 import { detectLocaleCurrency } from './SalaryInput'
 import JobTimelineStep from './onboarding/steps/JobTimelineStep'
@@ -402,7 +403,7 @@ export default function OnboardingForm() {
 
   useEffect(() => {
     if (isAuthenticated && !loading) {
-      const isComplete = localStorage.getItem('onboarding_complete') === 'true'
+      const isComplete = getCookie('onboarding_complete') === 'true'
       if (isComplete) navigate('/dashboard')
       else fetchProfile()
     }
@@ -545,7 +546,7 @@ export default function OnboardingForm() {
       let resolvedResumePath = formData.resume_url?.trim() || null
 
       if (formData.resume_file) {
-        const userId = localStorage.getItem('user_id')
+        const userId = getCookie('user_id')
         if (!userId) {
           throw new Error('Missing user id for resume upload')
         }
@@ -599,7 +600,7 @@ export default function OnboardingForm() {
       }
 
       await submitOnboarding(sanitizedPayload, token)
-      localStorage.setItem('onboarding_complete', 'true')
+      setCookie('onboarding_complete', 'true', { maxAge: 4 * 24 * 60 * 60 })
       navigate('/dashboard')
     } catch (err) {
       setError(err.message || 'Failed to submit onboarding')
