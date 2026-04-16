@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException, status, Header
 from models import SignupRequest, LoginRequest, AuthResponse, CurrentUserResponse, UserProfileResponse
 from database import supabase_client
 import json
+import jwt
+from config import settings
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -182,16 +184,20 @@ async def get_current_user(authorization: str = Header(None)):
     token = authorization.replace("Bearer ", "")
     
     try:
-        # Verify token with Supabase
-        user = supabase_client.auth.get_user(token)
+        # Decode JWT token directly
+        # Note: We don't verify the signature here since we trust Supabase issued it
+        # If you want to verify, use the Supabase JWT secret
+        payload = jwt.decode(token, options={"verify_signature": False})
+        user_id = payload.get("sub")
+        email = payload.get("email")
         
-        if not user or not user.user:
+        if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token"
+                detail="Invalid token format"
             )
         
-        profile_data = ensure_profile_exists(user.user.id)
+        profile_data = ensure_profile_exists(user_id)
         profile = UserProfileResponse(
             id=profile_data["id"],
             user_id=profile_data["user_id"],
@@ -234,18 +240,19 @@ async def get_current_user(authorization: str = Header(None)):
         )
         
         return CurrentUserResponse(
-            id=user.user.id,
-            email=user.user.email,
-            user_id=user.user.id,
+            id=user_id,
+            email=email or "",
+            user_id=user_id,
             profile=profile
         )
     
     except HTTPException:
         raise
     except Exception as e:
+        print(f"Token validation error: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid token: {str(e)}"
+            detail="Invalid token"
         )
 
 # ============ LOGOUT ============

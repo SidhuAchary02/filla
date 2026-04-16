@@ -14,7 +14,8 @@
 const INTENT_KEYWORDS = {
   // Questions about Gen AI / LLM experience
   gen_ai: [
-    "gen ai", "generative ai", "llm", "large language model",
+    "gen ai", "generative ai", "artificial intelligence", "ai",
+    "llm", "large language model",
     "chatgpt", "gpt-3", "gpt-4", "rag", "prompt engineering",
     "fine-tun", "transformer", "langchain", "openai", "claude",
     "bedrock", "anthropic"
@@ -333,13 +334,60 @@ function handleNonTechQuestion(question, profile) {
   if (q.includes('skills') || q.includes('expertise') || q.includes('technical')) {
     const skills = profile.skills || [];
     if (Array.isArray(skills) && skills.length > 0) {
-      return { value: skills.join(', '), matched: true, reason: "skills" };
+      // For generic "what are your skills?" questions, return comma-separated list
+      const skillNames = skills.map(s => {
+        if (typeof s === 'string') return s;
+        if (s && s.name) return s.name;
+        return '';
+      }).filter(Boolean);
+      
+      if (skillNames.length > 0) {
+        return { value: skillNames.join(', '), matched: true, reason: "skills" };
+      }
     }
   }
 
-  // Salary
+  // Specific skill experience: "How many years with [SkillName]?"
+  // Check user's actual skills list first, before trying generic categories
+  if ((q.includes('years') || q.includes('experience')) && q.includes('with')) {
+    const skills = profile.skills || [];
+    
+    if (Array.isArray(skills) && skills.length > 0) {
+      for (const skill of skills) {
+        const skillName = String(skill.name || skill).toLowerCase();
+        const skillNormalized = String(skill.normalized || '').toLowerCase();
+        
+        // Check if question mentions this skill (exact name or normalized version)
+        if (q.includes(skillName) || q.includes(skillNormalized)) {
+          // For skill objects with experience field
+          if (typeof skill === 'object' && skill.experience !== null && skill.experience !== undefined) {
+            return { 
+              value: skill.experience, 
+              matched: true, 
+              reason: `Matched skill experience: ${skill.name}` 
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // Salary/CTC - distinguish between current and expected
   if (q.includes('salary') || q.includes('ctc')) {
-    let value = profile.min_salary || profile.current_ctc;
+    // Current CTC
+    if (q.includes('current') && (q.includes('ctc') || q.includes('salary') || q.includes('compensation'))) {
+      const value = profile.current_ctc;
+      if (value) return { value, matched: true, reason: "current_ctc" };
+    }
+    
+    // Expected/Minimum CTC
+    if ((q.includes('expected') || q.includes('minimum')) && (q.includes('ctc') || q.includes('salary'))) {
+      const value = profile.min_salary || profile.expected_ctc;
+      if (value) return { value, matched: true, reason: "min_salary" };
+    }
+    
+    // Generic salary (fallback if no current/expected specified)
+    const value = profile.min_salary || profile.current_ctc;
     if (value) return { value, matched: true, reason: "salary" };
   }
 

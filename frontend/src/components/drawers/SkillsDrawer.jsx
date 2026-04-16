@@ -44,17 +44,19 @@ function SkillsDrawer({ isOpen, onClose, profile, onSave, token }) {
     setSuccess('')
 
     try {
-      // Transform skills from objects to just names
-      const skillNames = skills.map(skill => 
-        typeof skill === 'string' ? skill : skill.name
-      )
+      // Save full skill objects with experience (not just names)
+      const skillsData = skills.map(skill => ({
+        name: skill.name || skill,
+        normalized: skill.normalized || (typeof skill === 'string' ? skill.toLowerCase() : skill.name.toLowerCase()),
+        experience: skill.experience || null,
+      }))
 
       // Structure data to match API schema
       const updateData = {
-        skills: skillNames || [],
+        skills: skillsData || [],
       }
 
-      console.log('📌 Saving skills:', updateData)
+      console.log('📌 Saving skills with experience:', updateData)
 
       // Call API
       if (token) {

@@ -1,5 +1,7 @@
 const skillsData = [
   { "name": "Python", "normalized": "python" },
+  { "name": "Artificial Intelligence", "normalized": "artificial_intelligence" },
+  { "name": "Generative AI", "normalized": "generative_ai" },
   { "name": "JavaScript", "normalized": "javascript" },
   { "name": "TypeScript", "normalized": "typescript" },
   { "name": "React", "normalized": "react" },

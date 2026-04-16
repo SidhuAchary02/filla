@@ -21,6 +21,7 @@ SKILL_CATEGORY_MAP = {
     # Gen AI / LLM
     "gen_ai": {
         "keywords": [
+            "artificial intelligence", "ai",
             "llm", "large language model", "gpt", "chatgpt", "gpt-3", "gpt-4",
             "generative ai", "gen ai", "rag", "retrieval augmented",
             "prompt engineering", "fine-tuning", "transformer",

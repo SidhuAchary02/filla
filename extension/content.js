@@ -769,6 +769,22 @@
       }
     }
 
+    // Skill experience matching
+    // "How many years of work experience do you have with [Skill]?"
+    // "Years of experience with [Skill]?"
+    if ((q.includes('years') || q.includes('experience')) && (q.includes('with') || q.includes('skill'))) {
+      const skills = Array.isArray(profile.skills) ? profile.skills : [];
+      
+      // Extract skill name from question
+      // e.g., "How many years with Python?" → look for skill containing "python"
+      for (const skill of skills) {
+        const skillName = String(skill.name || skill).toLowerCase();
+        if (q.includes(skillName) && skill.experience) {
+          return { type: 'personal', key: 'skill_experience', value: skill.experience };
+        }
+      }
+    }
+
     return { type: 'unknown', key: null, value: null };
   }
 

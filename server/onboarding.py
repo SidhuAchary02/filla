@@ -177,7 +177,7 @@ async def submit_onboarding(
             "education": [_to_dict(edu) for edu in request.education],
             "projects": [_to_dict(proj) for proj in request.projects],
             "links": _to_dict(request.links),
-            "skills": request.skills,
+            "skills": [_to_dict(skill) for skill in request.skills] if request.skills else [],
             "languages": request.languages,
             "current_ctc": request.current_ctc,
             "min_salary": request.min_salary,
@@ -186,7 +186,18 @@ async def submit_onboarding(
         }
 
         # Compute normalized_profile from work_experience + skills
-        payload["normalized_profile"] = _compute_normalized_profile(payload)
+        # Extract skill names for normalization
+        skills_for_normalization = [
+            skill.get("name") if isinstance(skill, dict) else skill.name 
+            for skill in request.skills
+        ] if request.skills else []
+        
+        profile_for_normalization = {
+            "skills": skills_for_normalization,
+            "work_experience": payload["work_experience"],
+            "notice_period": request.notice_period if hasattr(request, 'notice_period') and request.notice_period else "immediate"
+        }
+        payload["normalized_profile"] = _compute_normalized_profile(profile_for_normalization)
 
         supabase_client.table("user_profiles").update(payload).eq("user_id", user_id).execute()
         profile = _get_profile_by_user_id(user_id)
@@ -301,7 +312,8 @@ async def update_personal_info(
         if request.location is not None:
             payload["location"] = _to_dict(request.location)
         if request.skills is not None:
-            payload["skills"] = request.skills
+            # Convert skill objects to dicts for storage
+            payload["skills"] = [_to_dict(skill) if hasattr(skill, 'model_dump') or hasattr(skill, 'dict') else skill for skill in request.skills]
         if request.languages is not None:
             payload["languages"] = request.languages
         if request.education is not None:
@@ -343,8 +355,23 @@ async def update_personal_info(
         if request.work_experience is not None or request.skills is not None:
             # Get current profile to fill in any missing fields
             current = _get_profile_by_user_id(user_id)
+            
+            # Extract skill names from skill objects for normalization
+            skills_for_normalization = []
+            if request.skills is not None:
+                skills_for_normalization = [
+                    skill.get("name") if isinstance(skill, dict) else skill.name 
+                    for skill in request.skills
+                ]
+            else:
+                current_skills = current.get("skills") or []
+                skills_for_normalization = [
+                    skill.get("name") if isinstance(skill, dict) else skill 
+                    for skill in current_skills
+                ]
+            
             merged_profile = {
-                "skills": request.skills if request.skills is not None else (current.get("skills") or []),
+                "skills": skills_for_normalization,
                 "work_experience": request.work_experience if request.work_experience is not None else (current.get("work_experience") or []),
                 "notice_period": request.notice_period if request.notice_period is not None else (current.get("notice_period") or "immediate")
             }

@@ -198,7 +198,29 @@ export async function updateUserProfile(data, token) {
 
     if (!response.ok) {
       const error = await response.json()
-      throw new Error(error.detail || 'Failed to update profile')
+      
+      // Handle validation errors properly
+      const detail = error.detail
+      let message = 'Failed to update profile'
+
+      if (typeof detail === 'string') {
+        message = detail
+      } else if (Array.isArray(detail) && detail.length > 0) {
+        // Format validation errors properly
+        const errorMessages = detail.map(err => {
+          if (typeof err === 'string') return err
+          if (err && typeof err === 'object') {
+            const loc = Array.isArray(err.loc) ? err.loc.join('.') : 'field'
+            return `${loc}: ${err.msg || 'Invalid value'}`
+          }
+          return String(err)
+        })
+        message = errorMessages.join('; ')
+      } else if (detail && typeof detail === 'object') {
+        message = JSON.stringify(detail)
+      }
+
+      throw new Error(message)
     }
 
     return await response.json()

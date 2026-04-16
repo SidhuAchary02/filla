@@ -588,7 +588,7 @@ export default function OnboardingForm() {
         role: formData.role?.trim() || null,
         current_ctc: currentSalaryAmount,
         min_salary: salaryAmount,
-        skills: normalizeSkills(formData.skills).map(skill => skill.normalized),
+        skills: normalizeSkills(formData.skills),
         languages: normalizeLanguages(formData.languages).map(language => language.normalized),
         location: {
           country: formData.location.country || null,

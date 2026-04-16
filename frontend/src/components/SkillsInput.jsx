@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import skillsData from '../data/skills'
+import { X, ChevronDown } from 'lucide-react'
 
 const normalizeText = value => value.trim().toLowerCase().replace(/\s+/g, ' ')
 
@@ -12,6 +13,7 @@ const toSkillObject = skill => {
     return {
       name,
       normalized: normalizeText(name),
+      experience: null,
     }
   }
 
@@ -21,6 +23,7 @@ const toSkillObject = skill => {
   return {
     name,
     normalized: String(skill.normalized || normalizeText(name)).trim().toLowerCase(),
+    experience: skill.experience || null,
   }
 }
 
@@ -44,6 +47,8 @@ export default function SkillsInput({
   const wrapperRef = useRef(null)
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
+  const [editingSkill, setEditingSkill] = useState(null)  // {normalized, experience}
+  const [editingExperience, setEditingExperience] = useState('')
 
   const selectedSkills = useMemo(() => dedupeSkills((Array.isArray(value) ? value : []).map(toSkillObject).filter(Boolean)), [value])
   const selectedNormalized = useMemo(() => new Set(selectedSkills.map(skill => skill.normalized)), [selectedSkills])
@@ -78,13 +83,38 @@ export default function SkillsInput({
     onChange(dedupeSkills(nextSkills))
   }
 
-  const addSkill = skill => {
+  const addSkill = (skill) => {
     const skillObject = toSkillObject(skill)
     if (!skillObject || selectedNormalized.has(skillObject.normalized)) return
 
-    updateSkills([...selectedSkills, skillObject])
+    // Show experience input modal
+    setEditingSkill({ normalized: skillObject.normalized, name: skillObject.name, new: true, skillObj: skillObject })
+    setEditingExperience('')
     setQuery('')
     setOpen(false)
+  }
+
+  const saveExperience = () => {
+    if (!editingSkill) return
+
+    const experience = editingExperience ? parseFloat(editingExperience) : null
+    
+    if (editingSkill.new) {
+      // Adding new skill with experience
+      const newSkill = { ...editingSkill.skillObj, experience }
+      updateSkills([...selectedSkills, newSkill])
+    } else {
+      // Editing existing skill experience
+      const updated = selectedSkills.map(s => 
+        s.normalized === editingSkill.normalized 
+          ? { ...s, experience }
+          : s
+      )
+      updateSkills(updated)
+    }
+
+    setEditingSkill(null)
+    setEditingExperience('')
   }
 
   const removeSkill = normalized => {
@@ -110,26 +140,51 @@ export default function SkillsInput({
 
   return (
     <div ref={wrapperRef} className={`relative ${className}`}>
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100">
-        <div className="flex min-h-12 flex-wrap gap-2 px-3 py-2">
-          {selectedSkills.map(skill => (
-            <span
-              key={skill.normalized}
-              className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-800"
-            >
-              {skill.name}
-              <button
-                type="button"
-                onClick={() => removeSkill(skill.normalized)}
-                disabled={disabled}
-                className="rounded-full text-blue-500 transition hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label={`Remove ${skill.name}`}
+      {/* Skills Display */}
+      <div className="space-y-3">
+        {selectedSkills.length > 0 && (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {selectedSkills.map(skill => (
+              <div
+                key={skill.normalized}
+                className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
               >
-                ×
-              </button>
-            </span>
-          ))}
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-slate-900">{skill.name}</p>
+                  <p className="text-xs text-slate-500">
+                    {skill.experience ? `${skill.experience} year${skill.experience !== 1 ? 's' : ''}` : 'No experience set'}
+                  </p>
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingSkill({ normalized: skill.normalized, name: skill.name, new: false })
+                      setEditingExperience(skill.experience ? String(skill.experience) : '')
+                    }}
+                    disabled={disabled}
+                    className="rounded px-2 py-1 text-xs font-medium text-blue-600 transition hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Edit experience"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeSkill(skill.normalized)}
+                    disabled={disabled}
+                    className="rounded p-1 text-slate-400 transition hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-label={`Remove ${skill.name}`}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
+        {/* Add Skill Input */}
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100">
           <input
             type="text"
             value={query}
@@ -139,13 +194,14 @@ export default function SkillsInput({
             }}
             onFocus={() => setOpen(true)}
             onKeyDown={handleKeyDown}
-            placeholder={selectedSkills.length ? '' : placeholder}
+            placeholder={placeholder}
             disabled={disabled}
-            className="min-w-[180px] flex-1 border-0 p-0 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-0 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
+            className="w-full border-0 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-0 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
           />
         </div>
       </div>
 
+      {/* Dropdown for skill selection */}
       {open && (
         <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
           <div className="max-h-64 overflow-auto p-2">
@@ -171,9 +227,7 @@ export default function SkillsInput({
                 onClick={() => addSkill({ name: query.trim(), normalized: normalizedQuery })}
                 className="mt-1 flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-blue-700 transition hover:bg-blue-50"
               >
-                <span>
-                  Add &quot;{query.trim()}&quot;
-                </span>
+                <span>Add &quot;{query.trim()}&quot;</span>
                 <span className="text-xs text-blue-500">New</span>
               </button>
             )}
@@ -183,6 +237,55 @@ export default function SkillsInput({
                 No matching skills found
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Experience Input Modal */}
+      {editingSkill && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
+            <h3 className="mb-4 text-lg font-semibold text-slate-900">
+              {editingSkill.new ? 'Add' : 'Edit'} Experience for {editingSkill.name}
+            </h3>
+            
+            <div className="mb-6 space-y-2">
+              <label className="block text-sm font-medium text-slate-700">
+                Years of Experience
+              </label>
+              <input
+                type="number"
+                value={editingExperience}
+                onChange={e => setEditingExperience(e.target.value)}
+                placeholder="e.g., 3.5"
+                min="0"
+                step="0.5"
+                max="60"
+                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                autoFocus
+              />
+              <p className="text-xs text-slate-500">Leave empty if you don't want to specify</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingSkill(null)
+                  setEditingExperience('')
+                }}
+                className="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveExperience}
+                className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+              >
+                {editingSkill.new ? 'Add Skill' : 'Save'}
+              </button>
+            </div>
           </div>
         </div>
       )}

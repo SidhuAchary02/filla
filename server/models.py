@@ -52,6 +52,15 @@ class LinksModel(BaseModel):
     github: Optional[str] = None
     portfolio: Optional[str] = None
 
+class SkillModel(BaseModel):
+    name: str
+    normalized: Optional[str] = None
+    experience: Optional[float] = None  # Years of experience with this skill
+
+class LanguageModel(BaseModel):
+    name: str
+    normalized: Optional[str] = None
+
 class OnboardingRequest(BaseModel):
     job_search_timeline: Optional[str] = None
     location: Optional[LocationModel] = None
@@ -62,7 +71,7 @@ class OnboardingRequest(BaseModel):
     education: List[EducationModel] = Field(default=[])
     projects: List[ProjectModel] = Field(default=[])
     links: Optional[LinksModel] = None
-    skills: List[str] = Field(default=[])
+    skills: List[SkillModel] = Field(default=[])
     languages: List[str] = Field(default=[])
     current_ctc: Optional[float] = None
     min_salary: Optional[float] = None
@@ -85,7 +94,7 @@ class PersonalInfoRequest(BaseModel):
     current_ctc: Optional[float] = None
     min_salary: Optional[float] = None
     notice_period: Optional[str] = None
-    skills: Optional[List[str]] = None  # List of skill names
+    skills: Optional[List[SkillModel]] = None  # List of skill objects with experience
     languages: Optional[List[str]] = None  # List of language names
     education: Optional[List[dict]] = None  # List of education objects
     work_experience: Optional[List[dict]] = None  # List of work experience objects
@@ -138,7 +147,7 @@ class OnboardingResponse(BaseModel):
     education: List[dict]
     projects: List[dict]
     links: Optional[dict]
-    skills: List[str]
+    skills: List[dict]  # List of skill objects with {name, normalized, experience}
     languages: List[str]
     onboarding_completed: bool
     created_at: datetime
@@ -185,7 +194,7 @@ class UserProfileResponse(BaseModel):
     education: List[dict]
     projects: List[dict]
     links: Optional[dict]
-    skills: List[str]
+    skills: List[dict]  # List of skill objects with {name, normalized, experience}
     languages: List[str]
     onboarding_completed: bool
     created_at: datetime
