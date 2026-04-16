@@ -1,27 +1,8 @@
 (() => {
   "use strict";
 
-  // Initialize FieldMatcher for intelligent form autofill
-  let fieldMatcher = null;
-  
-  // Safe initialization with error handling
-  try {
-    if (typeof FieldMatcher !== 'undefined') {
-      fieldMatcher = new FieldMatcher();
-      console.log('[Filla] FieldMatcher initialized successfully');
-    } else {
-      console.warn('[Filla] FieldMatcher class not available, waiting...');
-      // Retry initialization after a delay
-      setTimeout(() => {
-        if (typeof FieldMatcher !== 'undefined' && !fieldMatcher) {
-          fieldMatcher = new FieldMatcher();
-          console.log('[Filla] FieldMatcher initialized on retry');
-        }
-      }, 1000);
-    }
-  } catch (err) {
-    console.error('[Filla] Error initializing FieldMatcher:', err);
-  }
+  // Simple field matcher - no complex initialization needed
+  console.log('[Filla] ✓ Autofill engine loaded');
 
   const VALID_INPUT_TYPES = new Set(["text", "email", "number", "tel", "url", "date", "time"]);
   const IGNORED_INPUT_TYPES = new Set([
@@ -589,13 +570,7 @@
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     try {
       if (message.action === 'autofill' && message.profileData) {
-        if (!fieldMatcher) {
-          sendResponse({
-            success: false,
-            error: 'FieldMatcher not initialized on this page. Try refreshing.'
-          });
-          return true;
-        }
+        console.log('[Filla] Autofill triggered with profile data:', Object.keys(message.profileData));
         handleAutofillMessage(message.profileData, sendResponse);
         return true; // Will respond asynchronously
       }
@@ -610,79 +585,88 @@
 
   async function handleAutofillMessage(profileData, sendResponse) {
     try {
-      console.log('[Filla] Starting autofill with profile data:', Object.keys(profileData));
+      console.log('[Filla] Starting simple autofill...');
       
-      if (!fieldMatcher || typeof fieldMatcher.matchFormFields !== 'function') {
-        sendResponse({
-          success: false,
-          error: 'Field matcher not initialized. Try refreshing the page.'
-        });
-        return;
-      }
-
-      const matchedFields = fieldMatcher.matchFormFields(profileData) || [];
-      const filledElements = new WeakSet();
-      let filledCount = 0;
-
-      if (matchedFields.length > 0) {
-        matchedFields.forEach(({ element, formattedValue }) => {
-          try {
-            if (element && formattedValue !== null && formattedValue !== undefined && String(formattedValue).trim() !== '') {
-              element.value = String(formattedValue);
-              element.dispatchEvent(new Event('input', { bubbles: true }));
-              element.dispatchEvent(new Event('change', { bubbles: true }));
-              filledElements.add(element);
-              filledCount += 1;
-            }
-          } catch (_err) {
-            // Continue best-effort filling.
-          }
-        });
-      }
-
-      // Fallback pass: question-based mapping for dynamic fields.
+      // Get all form fields
       const allFields = Array.from(document.querySelectorAll('input, textarea, select'));
+      console.log(`[Filla] Found ${allFields.length} total form fields`);
+      
+      let filledCount = 0;
+      const filledFields = [];
       const handledRadioGroups = new Set();
 
-      allFields.forEach((field) => {
-        if (!isVisibleField(field) || !isAutofillCapable(field) || filledElements.has(field)) {
-          return;
+      // Process each field
+      for (const field of allFields) {
+        if (!isVisibleField(field) || !isAutofillCapable(field)) {
+          continue;
         }
 
         const question = extractQuestion(field);
-        const mapped = resolveQuestionMapping(question, profileData);
-        if (!mapped || mapped.value === null || mapped.value === undefined || mapped.value === '') {
-          return;
-        }
-
         const fieldType = getFieldType(field);
+        
+        // Skip radio buttons if we already handled this group
         if (fieldType === 'radio') {
           const radioName = field.getAttribute('name') || '';
-          if (!radioName || handledRadioGroups.has(radioName)) {
-            return;
+          if (radioName && handledRadioGroups.has(radioName)) {
+            continue;
           }
-          const didFill = fillRadioGroupByQuestion(field, mapped.value);
-          if (didFill) {
-            handledRadioGroups.add(radioName);
-            filledCount += 1;
-          }
-          return;
         }
 
-        const didFill = fillGenericField(field, mapped.value, fieldType);
-        if (didFill) {
-          filledCount += 1;
+        // Try to get value from profile using the question
+        let value = null;
+        let matched = false;
+
+        // First try: Use processQuestionV2 if available (intent-based matching)
+        if (typeof processQuestionV2 === 'function') {
+          try {
+            const result = processQuestionV2(question, profileData);
+            if (result.matched && result.value !== null && result.value !== undefined) {
+              value = result.value;
+              matched = true;
+              console.log(`[Filla] ✓ Intent-matched "${question}" → ${value}`);
+            }
+          } catch (e) {
+            console.warn(`[Filla] processQuestionV2 error for "${question}":`, e.message);
+          }
         }
-      });
+
+        // Second try: Direct keyword matching
+        if (!matched) {
+          const directMatch = resolveQuestionMapping(question, profileData);
+          if (directMatch && directMatch.value !== null && directMatch.value !== undefined) {
+            value = directMatch.value;
+            matched = true;
+            console.log(`[Filla] ✓ Direct-matched "${question}" → ${value}`);
+          }
+        }
+
+        // If we found a value, fill the field
+        if (matched && value !== null && value !== undefined) {
+          try {
+            if (fieldType === 'radio') {
+              const radioName = field.getAttribute('name') || '';
+              const filled = fillRadioGroupByQuestion(field, value);
+              if (filled) {
+                handledRadioGroups.add(radioName);
+                filledCount += 1;
+                filledFields.push({ question, value, type: fieldType });
+              }
+            } else {
+              const filled = fillGenericField(field, value, fieldType);
+              if (filled) {
+                filledCount += 1;
+                filledFields.push({ question, value, type: fieldType });
+              }
+            }
+          } catch (err) {
+            console.warn(`[Filla] Failed to fill "${question}":`, err.message);
+          }
+        }
+      }
+
+      console.log(`[Filla] Successfully filled ${filledCount}/${allFields.length} fields`);
 
       if (filledCount === 0) {
-        const fieldInfo = allFields
-          .slice(0, 12)
-          .map(el => `${extractQuestion(el)} [${getFieldType(el)}]`)
-          .join(', ');
-
-        console.warn(`[Filla] No matching fields found. Total fields on page: ${allFields.length}`);
-        console.warn(`[Filla] Sample fields: ${fieldInfo}`);
         sendResponse({
           success: false,
           error: `No matching form fields. Found ${allFields.length} total fields but none matched your profile.`
@@ -693,10 +677,7 @@
       sendResponse({
         success: true,
         filledCount,
-        fields: matchedFields.map((f) => ({
-          type: f.fieldType,
-          value: f.formattedValue
-        }))
+        fields: filledFields
       });
     } catch (error) {
       console.error('[Filla] Autofill error:', error);
@@ -708,18 +689,30 @@
   }
 
   function resolveQuestionMapping(question, profileData) {
-    const q = normalizeText(question).toLowerCase();
     const profile = profileData || {};
 
-    if (typeof window.mapToProfile === 'function') {
-      const mapped = window.mapToProfile(question, profile);
-      if (mapped && mapped.type !== 'unknown') {
-        return mapped;
+    // Use NEW autofill engine v2 (uses normalized_profile)
+    if (typeof processQuestionV2 === 'function') {
+      const result = processQuestionV2(question, profile);
+
+      if (result.matched && result.value !== null) {
+        // Map new engine result to old format for compatibility
+        return {
+          type: typeof result.value === 'number' ? 'experience' : 'personal',
+          key: null,
+          value: result.value,
+          confidence: result.confidence
+        };
       }
+
+      // Not matched
+      return { type: 'unknown', key: null, value: null };
     }
 
-    // Education yes/no fallback for questions like:
-    // "Have you completed ... Associate's Degree?"
+    // Fallback if engine not loaded
+    const q = normalizeText(question).toLowerCase();
+
+    // Yes/No fallback for education
     if (q.includes('education') || q.includes('degree')) {
       const education = Array.isArray(profile.education) ? profile.education : [];
       const degrees = education
@@ -739,12 +732,7 @@
       }
     }
 
-    // Generic years of experience fallback when no specific skill match is found.
-    if (q.includes('years') && q.includes('experience')) {
-      return { type: 'experience', key: null, value: 0 };
-    }
-
-    // Location yes/no fallback: "Are you currently based in Mumbai?"
+    // Location fallback: "Are you currently based in Mumbai?"
     if (q.includes('based in')) {
       const location = profile.location || {};
       const city = normalizeText(location.city || '').toLowerCase();
@@ -753,6 +741,31 @@
         const askedCity = normalizeText(match[1]).replace(/[?]/g, '').toLowerCase();
         const isBased = city && (city.includes(askedCity) || askedCity.includes(city));
         return { type: 'personal', key: 'location', value: isBased ? 'Yes' : 'No' };
+      }
+    }
+
+    // Salary/CTC matching
+    // Current CTC: "What is your current CTC?", "Current salary", "Current compensation"
+    if (q.includes('current') && (q.includes('ctc') || q.includes('salary') || q.includes('compensation'))) {
+      const currentCtc = profile.current_ctc;
+      if (currentCtc !== null && currentCtc !== undefined) {
+        return { type: 'personal', key: 'current_ctc', value: currentCtc };
+      }
+    }
+
+    // Expected/Minimum CTC: "What is your expected CTC?", "Expected salary", "Minimum salary"
+    if ((q.includes('expected') || q.includes('minimum')) && (q.includes('ctc') || q.includes('salary'))) {
+      const minSalary = profile.min_salary || profile.expected_ctc;
+      if (minSalary !== null && minSalary !== undefined) {
+        return { type: 'personal', key: 'min_salary', value: minSalary };
+      }
+    }
+
+    // Notice period matching: "What is your notice period?", "How much notice period?"
+    if (q.includes('notice') && q.includes('period')) {
+      const noticePeriod = profile.notice_period;
+      if (noticePeriod !== null && noticePeriod !== undefined) {
+        return { type: 'personal', key: 'notice_period', value: noticePeriod };
       }
     }
 

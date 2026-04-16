@@ -64,6 +64,7 @@ class OnboardingRequest(BaseModel):
     links: Optional[LinksModel] = None
     skills: List[str] = Field(default=[])
     languages: List[str] = Field(default=[])
+    current_ctc: Optional[float] = None
     min_salary: Optional[float] = None
 
 # ============ PERSONAL INFO MODELS ============

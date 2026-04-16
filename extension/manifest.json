@@ -1,29 +1,42 @@
 {
   "manifest_version": 3,
-  "name": "filla",
-  "version": "1.0",
+  "name": "Filla Autofill",
+  "version": "1.0.0",
   "description": "Smart form autofill with intelligent field detection",
-  "permissions": ["activeTab", "storage", "scripting", "tabs"],
-  "host_permissions": ["<all_urls>"],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Filla Autofill"
+    "default_title": "Filla Autofill",
+    "icons": {
+      "16": "logo.png",
+      "48": "logo.png",
+      "128": "logo.png"
+    }
   },
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["extension-auth.js", "field-matcher.js", "content.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "autofill-engine-v2.js",
+        "value-converter.js",
+        "extension-auth.js",
+        "content.js"
+      ],
       "run_at": "document_start",
-      "all_frames": true
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": ["onboarding.html"],
-      "matches": ["<all_urls>"]
+      "all_frames": false
     }
   ]
 }

@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException, status, Header
 from models import OnboardingRequest, OnboardingResponse, PersonalInfoRequest
 from database import supabase_client
 from datetime import datetime
+from normalizer import normalize_profile
+import json
 
 router = APIRouter(prefix="/api", tags=["onboarding"])
 
@@ -128,6 +130,31 @@ def _ensure_profile_exists(user_id: str):
     )
 
 
+def _compute_normalized_profile(profile: dict) -> dict:
+    """
+    Compute normalized_profile from work_experience and skills.
+    
+    This creates experience_years breakdown like:
+    {
+      "notice_period": "immediate",
+      "experience_years": {
+        "gen_ai": 0,
+        "mlops": 0,
+        "aws": 3,
+        "backend": 2,
+        ...
+      }
+    }
+    """
+    skills = profile.get("skills") or []
+    work_experience = profile.get("work_experience") or []
+    notice_period = profile.get("notice_period") or "immediate"
+
+    normalized = normalize_profile(skills, work_experience)
+    normalized["notice_period"] = notice_period
+    return normalized
+
+
 # ============ SUBMIT ONBOARDING ============
 @router.post("/onboarding", response_model=OnboardingResponse)
 async def submit_onboarding(
@@ -152,10 +179,14 @@ async def submit_onboarding(
             "links": _to_dict(request.links),
             "skills": request.skills,
             "languages": request.languages,
+            "current_ctc": request.current_ctc,
             "min_salary": request.min_salary,
             "onboarding_completed": True,
             "updated_at": datetime.utcnow().isoformat()
         }
+
+        # Compute normalized_profile from work_experience + skills
+        payload["normalized_profile"] = _compute_normalized_profile(payload)
 
         supabase_client.table("user_profiles").update(payload).eq("user_id", user_id).execute()
         profile = _get_profile_by_user_id(user_id)
@@ -308,6 +339,17 @@ async def update_personal_info(
         if request.notice_period is not None:
             payload["notice_period"] = request.notice_period
         
+        # Compute normalized_profile if work_experience or skills were updated
+        if request.work_experience is not None or request.skills is not None:
+            # Get current profile to fill in any missing fields
+            current = _get_profile_by_user_id(user_id)
+            merged_profile = {
+                "skills": request.skills if request.skills is not None else (current.get("skills") or []),
+                "work_experience": request.work_experience if request.work_experience is not None else (current.get("work_experience") or []),
+                "notice_period": request.notice_period if request.notice_period is not None else (current.get("notice_period") or "immediate")
+            }
+            payload["normalized_profile"] = _compute_normalized_profile(merged_profile)
+        
         try:
             # Try update via Supabase SDK
             update_response = supabase_client.table("user_profiles").update(payload).eq("user_id", user_id).execute()
@@ -414,6 +456,12 @@ async def get_autofill_data(authorization: str = Header(None)):
     try:
         profile = _ensure_profile_exists(user_id)
 
+        # Get normalized_profile with computed experience_years
+        normalized = profile.get("normalized_profile") or {}
+        if not normalized:
+            # Compute on-the-fly if not in DB
+            normalized = _compute_normalized_profile(profile)
+
         autofill_data = {
             "role": profile.get("role"),
             "job_search_timeline": profile.get("job_search_timeline"),
@@ -427,14 +475,17 @@ async def get_autofill_data(authorization: str = Header(None)):
             "location": profile.get("location") or {},
             "resume_url": profile.get("resume_url"),
             "min_salary": profile.get("min_salary"),
-            # Backward-compatible keys used by question mapping engine
+            # Extension autofill keys - NOW from normalized_profile
             "full_name": profile.get("full_name"),
             "email": profile.get("email"),
             "phone": profile.get("phone"),
-            "experience": profile.get("experience") or {},
-            "notice_period": profile.get("notice_period"),
+            "first_name": profile.get("first_name"),
+            "last_name": profile.get("last_name"),
+            "notice_period": normalized.get("notice_period") or profile.get("notice_period"),
             "current_ctc": profile.get("current_ctc"),
             "expected_ctc": profile.get("expected_ctc") or profile.get("min_salary"),
+            # KEY: Computed experience breakdown for autofill questions
+            "normalized_profile": normalized
         }
 
         return {

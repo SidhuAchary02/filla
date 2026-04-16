@@ -1,51 +1,16 @@
 // Smart Field Matcher
-// Matches form fields to profile data using intelligent pattern matching
+// Matches form fields to profile data using intelligent pattern matching with intent mapping
 
 class FieldMatcher {
   constructor() {
-    // Field patterns to match against field names, labels, and placeholders
-    this.patterns = {
-      full_name: {
-        patterns: ['full name', 'fullname', 'name', 'candidate name', 'applicant name', 'your name'],
-        value_key: 'full_name'
-      },
-      first_name: {
-        patterns: ['first name', 'firstname', 'given name', 'first'],
-        value_key: 'first_name'
-      },
-      last_name: {
-        patterns: ['last name', 'lastname', 'surname', 'family name', 'last'],
-        value_key: 'last_name'
-      },
-      email: {
-        patterns: ['email', 'email address', 'e-mail', 'mail', 'contact email', 'email id', 'email addressemail', 'addressemail'],
-        value_key: 'email'
-      },
-      phone: {
-        patterns: ['phone', 'phone number', 'mobile', 'mobile number', 'contact number', 'telephone', 'phone no', 'contact phone', 'mobile no', 'mobile phone'],
-        value_key: 'phone'
-      },
-      phone_country_code: {
-        patterns: ['phone country code', 'country code', 'code'],
-        value_key: 'phone'
-      },
-      skills: {
-        patterns: ['skills', 'technical skills', 'expertise', 'competencies', 'proficiency', 'programming skills'],
-        value_key: 'skills'
-      },
-      experience: {
-        patterns: ['experience', 'total experience', 'years of experience', 'work experience', 'total exp', 'exp'],
-        value_key: 'experience'
-      },
-      notice_period: {
-        patterns: ['notice period', 'notice', 'availability', 'joining date', 'start date', 'when can you join'],
-        value_key: 'notice_period'
-      },
-      current_ctc: {
-        patterns: ['current ctc', 'current salary', 'current compensation', 'ctc', 'salary', 'current pay'],
-        value_key: 'current_ctc'
-      },
-    };
+    // Use the comprehensive field intent mapping if available
+    if (typeof findBestFieldIntent !== 'undefined' && typeof FIELD_INTENT_MAPPING !== 'undefined') {
+      this.useIntentMapping = true;
+      console.log('[Filla] Using comprehensive field intent mapping');
+    } else {
+      this.useIntentMapping = false;
+      console.log('[Filla] Field intent mapping not available, using fallback patterns');
+    }
   }
 
   /**
@@ -78,7 +43,7 @@ class FieldMatcher {
   /**
    * Get field type from element (name, id, placeholder, label)
    * @param {HTMLElement} element - Form field element
-   * @returns {Object|null} {type, confidence} or null
+   * @returns {Object|null} {type, confidence, profileKey} or null
    */
   identifyFieldType(element) {
     let combinedText = '';
@@ -119,28 +84,25 @@ class FieldMatcher {
     // Combine all text sources
     combinedText = [name, id, placeholder, labelText, ariaLabel].join(' ');
 
-    let bestMatch = null;
-    let highestConfidence = 0;
-
-    // Check against all patterns
-    for (const [fieldType, config] of Object.entries(this.patterns)) {
-      if (this.matchPatterns(combinedText, config.patterns)) {
-        // Calculate confidence based on how specific the match is
-        const normalizedCombined = this.normalize(combinedText);
-        const matchedPattern = config.patterns.find(p => 
-          normalizedCombined.includes(this.normalize(p)) || 
-          this.normalize(p).includes(normalizedCombined)
-        );
-        const confidence = matchedPattern.length / normalizedCombined.length;
-
-        if (confidence > highestConfidence) {
-          highestConfidence = confidence;
-          bestMatch = { type: fieldType, ...config, confidence };
+    // Use intent mapping if available
+    if (this.useIntentMapping && typeof findBestFieldIntent !== 'undefined') {
+      const fieldIntent = findBestFieldIntent(combinedText);
+      if (fieldIntent && typeof FIELD_INTENT_MAPPING !== 'undefined') {
+        const intentConfig = FIELD_INTENT_MAPPING[fieldIntent];
+        if (intentConfig) {
+          return {
+            type: fieldIntent,
+            profileKey: intentConfig.profileKey,
+            subKey: intentConfig.subKey,
+            isCompound: intentConfig.isCompound,
+            confidence: 0.95 // High confidence when using intent mapping
+          };
         }
       }
     }
 
-    return bestMatch;
+    // Fallback to legacy pattern matching if intent mapping not available
+    return null;
   }
 
   /**
@@ -155,20 +117,27 @@ class FieldMatcher {
     switch (fieldType) {
       case 'skills':
         // Skills are array, join with comma
-        return Array.isArray(value) ? value.join(', ') : value;
+        return Array.isArray(value) ? value.map(s => typeof s === 'string' ? s : s.name).join(', ') : value;
 
       case 'experience':
-        // Experience is object {skill: years}, format as readable
-        if (typeof value === 'object') {
-          return Object.entries(value)
-            .map(([skill, years]) => `${skill}: ${years} years`)
-            .join(', ');
-        }
-        return value;
+      case 'experience_level':
+        // Experience level formatting
+        return String(value);
 
       case 'current_ctc':
+      case 'min_salary':
         // Format as number with commas
-        return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        if (typeof value === 'number') {
+          return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+        return String(value);
+
+      case 'full_name':
+        // Combine first and last name if this is a compound field
+        if (typeof value === 'object') {
+          return [value.first_name, value.last_name].filter(Boolean).join(' ');
+        }
+        return String(value);
 
       default:
         return String(value);
@@ -176,9 +145,36 @@ class FieldMatcher {
   }
 
   /**
+   * Get value from profile using field configuration
+   * @param {Object} profileData - User profile data
+   * @param {Object} fieldConfig - Field configuration with profileKey and subKey
+   * @returns {any} The value from profile
+   */
+  getProfileValueByConfig(profileData, fieldConfig) {
+    if (!profileData || !fieldConfig) return null;
+
+    let value = profileData[fieldConfig.profileKey];
+
+    // Handle nested keys (like location.city)
+    if (fieldConfig.subKey && typeof value === 'object' && value !== null) {
+      value = value[fieldConfig.subKey];
+    }
+
+    // Handle compound fields like full_name
+    if (fieldConfig.isCompound && fieldConfig.profileKey === 'first_name') {
+      value = {
+        first_name: profileData.first_name,
+        last_name: profileData.last_name
+      };
+    }
+
+    return value;
+  }
+
+  /**
    * Match all form fields on page and return autofill suggestions
    * @param {Object} profileData - User profile data
-   * @returns {Array<Object>} Array of {element, fieldType, suggestedValue}
+   * @returns {Array<Object>} Array of {element, fieldType, suggestedValue, profileKey}
    */
   matchFormFields(profileData) {
     const suggestions = [];
@@ -201,40 +197,63 @@ class FieldMatcher {
       }
 
       const fieldMatch = this.identifyFieldType(element);
-      if (fieldMatch && profileData[fieldMatch.value_key]) {
-        const elementInfo = `${fieldMatch.type}(${(fieldMatch.confidence * 100).toFixed(0)}%)`;
-        debugInfo.push(elementInfo);
+      if (fieldMatch) {
+        // Get value from profile based on field configuration
+        const value = this.getProfileValueByConfig(profileData, fieldMatch);
         
-        suggestions.push({
-          element,
-          fieldType: fieldMatch.type,
-          fieldKey: fieldMatch.value_key,
-          value: profileData[fieldMatch.value_key],
-          formattedValue: this.formatValue(fieldMatch.type, profileData[fieldMatch.value_key]),
-          confidence: fieldMatch.confidence,
-        });
+        if (value) {
+          const elementInfo = `${fieldMatch.type}(${(fieldMatch.confidence * 100).toFixed(0)}%)`;
+          debugInfo.push(elementInfo);
+          
+          suggestions.push({
+            element,
+            fieldType: fieldMatch.type,
+            profileKey: fieldMatch.profileKey,
+            subKey: fieldMatch.subKey,
+            value: value,
+            formattedValue: this.formatValue(fieldMatch.type, value),
+            confidence: fieldMatch.confidence,
+          });
+        }
       }
     });
 
     console.log('[Filla] Matched fields:', debugInfo.join(', '));
+    console.log('[Filla] Suggestions:', suggestions.length);
     return suggestions;
   }
 
   /**
-   * Auto-fill form with suggestions
+   * Auto-fill form with suggestions using smart value conversion
    * @param {Array<Object>} suggestions - From matchFormFields()
    * @returns {number} Number of fields filled
    */
   autofillForm(suggestions) {
     let filledCount = 0;
 
-    suggestions.forEach(({ element, formattedValue, fieldType }) => {
+    suggestions.forEach(({ element, formattedValue, fieldType, profileKey }) => {
       try {
+        // Get the actual input type from the HTML element
+        const elementType = element.getAttribute('type') || (element.tagName === 'TEXTAREA' ? 'textarea' : 'text');
+        
+        // Convert value based on field type using value converter if available
+        let finalValue = formattedValue;
+        if (typeof formatValueForField === 'function') {
+          finalValue = formatValueForField(formattedValue, fieldType, elementType, element);
+        } else if (typeof convertValueForFieldType === 'function') {
+          finalValue = convertValueForFieldType(formattedValue, elementType);
+        }
+
+        // Skip if value is empty after conversion
+        if (!finalValue || String(finalValue).trim() === '') {
+          return;
+        }
+
         // Clear any existing value first
         element.value = '';
         
         // Set the new value
-        element.value = formattedValue;
+        element.value = String(finalValue);
         
         // Trigger blur to ensure any validation runs
         element.dispatchEvent(new Event('blur', { bubbles: true }));
@@ -246,7 +265,7 @@ class FieldMatcher {
         element.dispatchEvent(new Event('input', { bubbles: true }));
 
         filledCount++;
-        console.log(`[Filla] Filled field: ${fieldType} = ${formattedValue.substring(0, 50)}...`);
+        console.log(`[Filla] Filled field: ${fieldType} (${elementType}) = ${String(finalValue).substring(0, 50)}...`);
       } catch (error) {
         console.error('[Filla] Error filling field:', error);
       }

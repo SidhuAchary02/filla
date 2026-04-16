@@ -132,6 +132,11 @@ const getDefaultFormData = () => ({
   links: { linkedin: '', github: '', portfolio: '' },
   skills: [],
   languages: [],
+  current_salary: {
+    amount: null,
+    currency: detectLocaleCurrency(),
+    period: 'yearly',
+  },
   salary_expectation: {
     amount: null,
     currency: detectLocaleCurrency(),
@@ -153,6 +158,7 @@ const getInitialFormData = () => {
       ...draft,
       location: { ...defaults.location, ...(draft?.location || {}) },
       links: { ...defaults.links, ...(draft?.links || {}) },
+      current_salary: { ...defaults.current_salary, ...(draft?.current_salary || {}) },
       salary_expectation: { ...defaults.salary_expectation, ...(draft?.salary_expectation || {}) },
     }
   } catch {
@@ -432,6 +438,14 @@ export default function OnboardingForm() {
             },
             skills: Array.isArray(prev.skills) && prev.skills.length > 0 ? prev.skills : normalizeSkills(profile.skills),
             languages: Array.isArray(prev.languages) && prev.languages.length > 0 ? prev.languages : normalizeLanguages(profile.languages),
+            current_salary: {
+              amount:
+                prev.current_salary?.amount !== null && prev.current_salary?.amount !== undefined
+                  ? prev.current_salary.amount
+                  : (typeof profile.current_ctc === 'number' ? profile.current_ctc : null),
+              currency: prev.current_salary?.currency || detectLocaleCurrency(),
+              period: prev.current_salary?.period || 'yearly',
+            },
             salary_expectation: {
               amount:
                 prev.salary_expectation?.amount !== null && prev.salary_expectation?.amount !== undefined
@@ -559,7 +573,11 @@ export default function OnboardingForm() {
 
       const formDataForApi = { ...formData }
       delete formDataForApi.resume_file
+      delete formDataForApi.current_salary
       delete formDataForApi.salary_expectation
+
+      const rawCurrentSalaryAmount = formData.current_salary?.amount
+      const currentSalaryAmount = typeof rawCurrentSalaryAmount === 'number' && Number.isFinite(rawCurrentSalaryAmount) ? rawCurrentSalaryAmount : null
 
       const rawSalaryAmount = formData.salary_expectation?.amount
       const salaryAmount = typeof rawSalaryAmount === 'number' && Number.isFinite(rawSalaryAmount) ? rawSalaryAmount : null
@@ -568,6 +586,7 @@ export default function OnboardingForm() {
         ...formDataForApi,
         resume_url: resolvedResumePath,
         role: formData.role?.trim() || null,
+        current_ctc: currentSalaryAmount,
         min_salary: salaryAmount,
         skills: normalizeSkills(formData.skills).map(skill => skill.normalized),
         languages: normalizeLanguages(formData.languages).map(language => language.normalized),

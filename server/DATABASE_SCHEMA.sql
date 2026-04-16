@@ -50,8 +50,10 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   skills jsonb DEFAULT '[]'::jsonb, -- ["Python", "React", "FastAPI"]
   languages jsonb DEFAULT '[]'::jsonb, -- ["English", "Spanish"]
   
-  -- Salary Expectation
+  -- Salary & Compensation
+  current_ctc decimal(12, 2),
   min_salary decimal(12, 2),
+  notice_period varchar(50),
   
   -- Employment Information
   ethnicity varchar(255),
@@ -64,6 +66,10 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   gender varchar(50), -- "Male", "Female", "Non-binary", etc.
   veteran varchar(50), -- "Yes", "No", "Prefer not to answer"
   
+  -- Normalized Profile (computed field for autofill)
+  -- Stores calculated experience_years: { gen_ai, mlops, aws, backend, cicd, python, react, sql, devops }
+  normalized_profile jsonb DEFAULT 'null'::jsonb,
+
   -- Metadata
   onboarding_completed boolean DEFAULT false,
   created_at timestamp with time zone DEFAULT now(),
@@ -92,6 +98,8 @@ ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS projects jsonb DEFAULT '[]'::
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS links jsonb DEFAULT 'null'::jsonb;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS skills jsonb DEFAULT '[]'::jsonb;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS languages jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS current_ctc decimal(12, 2);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS notice_period varchar(50);
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS min_salary decimal(12, 2);
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS ethnicity varchar(255);
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS work_authorized_us varchar(50);
@@ -103,6 +111,7 @@ ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS lgbtq varchar(50);
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS gender varchar(50);
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS veteran varchar(50);
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS onboarding_completed boolean DEFAULT false;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS normalized_profile jsonb DEFAULT 'null'::jsonb;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS created_at timestamp with time zone DEFAULT now();
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone DEFAULT now();
 

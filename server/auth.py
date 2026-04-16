@@ -104,6 +104,9 @@ async def signup(request: SignupRequest):
                 "job_search_timeline": None,
                 "location": None,
                 "resume_url": None,
+                "current_ctc": None,
+                "min_salary": None,
+                "notice_period": None,
                 "experience_level": None,
                 "role": None,
                 "work_experience": [],
@@ -112,7 +115,6 @@ async def signup(request: SignupRequest):
                 "links": None,
                 "skills": [],
                 "languages": [],
-                "min_salary": None,
                 "onboarding_completed": False
             }).execute()
         except Exception as e:
