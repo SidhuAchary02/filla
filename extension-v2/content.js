@@ -27,12 +27,33 @@
     }
 
     // ─── Fill: Text / Email / Number / Tel / URL / Search ─────────────────────
-    function fillText(el, value) {
-        el.focus();
-        el.value = value;
+function fillText(el, value) {
+    el.focus();
+
+    const type = (el.getAttribute("type") || "").toLowerCase();
+
+    try {
+        if (type === "number") {
+            const num = Number(value);
+
+            if (!isNaN(num)) {
+                el.value = num;
+            } else {
+                console.warn("[Filla] ❌ Invalid number skipped:", value);
+                return;
+            }
+        } else {
+            el.value = value;
+        }
+
         dispatchEvents(el);
+
         console.log(`[Filla] ✅ Text filled: "${el.name || el.id}" → "${value}"`);
+
+    } catch (err) {
+        console.warn("[Filla] fillText error:", err);
     }
+}
 
     // ─── Fill: Textarea ────────────────────────────────────────────────────────
     function fillTextarea(el, value) {
@@ -44,65 +65,53 @@
 
     // ─── Fill: Select (Dropdown) ──────────────────────────────────────────────
     function fillSelect(el, value) {
-        const normalVal = FM.normalize(value);
-        let matched = false;
+        const target = FM.normalize(value);
 
         for (const opt of el.options) {
-            const optText = FM.normalize(opt.text);
-            const optValue = FM.normalize(opt.value);
+            const text = FM.normalize(opt.text);
 
-            if (
-                optText === normalVal ||
-                optValue === normalVal ||
-                optText.includes(normalVal) ||
-                normalVal.includes(optText)
-            ) {
-                el.value = opt.value;
-                matched = true;
-                break;
+            if (text.includes(target) || target.includes(text)) {
+                el.selectedIndex = opt.index;
+
+                el.dispatchEvent(new Event("change", { bubbles: true }));
+
+                console.log("[Filla] ✅ Select chosen:", opt.text);
+                return;
             }
-        }
-
-        if (matched) {
-            dispatchEvents(el);
-            console.log(`[Filla] ✅ Select filled: "${el.name || el.id}" → "${value}"`);
-        } else {
-            console.warn(`[Filla] ⚠️ Select no match: "${el.name || el.id}" for value "${value}"`);
         }
     }
 
+    const customDropdowns = document.querySelectorAll('[role="combobox"]');
+
+    customDropdowns.forEach(dd => {
+        dd.click(); // open
+
+        const options = document.querySelectorAll('[role="option"]');
+
+        options.forEach(opt => {
+            if (opt.innerText.toLowerCase().includes(value.toLowerCase())) {
+                opt.click();
+            }
+        });
+    });
+
     // ─── Fill: Radio Button Group ─────────────────────────────────────────────
     function fillRadio(radios, value) {
-        const normalVal = FM.normalize(value);
-        let matched = false;
+        const target = FM.normalize(value);
 
         for (const radio of radios) {
-            const radioVal = FM.normalize(radio.value);
-            const radioLabel = (() => {
-                if (radio.id) {
-                    const lbl = document.querySelector(`label[for="${radio.id}"]`);
-                    if (lbl) return FM.normalize(lbl.innerText || lbl.textContent);
-                }
-                const lbl = radio.closest("label");
-                return lbl ? FM.normalize(lbl.innerText || lbl.textContent) : "";
-            })();
+            const labelText = (
+                radio.closest("label")?.innerText ||
+                document.querySelector(`label[for="${radio.id}"]`)?.innerText ||
+                radio.parentElement?.innerText ||
+                ""
+            ).toLowerCase();
 
-            if (
-                radioVal.includes(normalVal) ||
-                normalVal.includes(radioVal) ||
-                radioLabel.includes(normalVal) ||
-                normalVal.includes(radioLabel)
-            ) {
-                radio.checked = true;
-                dispatchEvents(radio);
-                matched = true;
-                console.log(`[Filla] ✅ Radio selected: "${radio.name}" → "${radio.value}"`);
-                break;
+            if (labelText.includes(target) || target.includes(labelText)) {
+                radio.click(); // 🔥 IMPORTANT: use click, not checked
+                console.log("[Filla] ✅ Radio clicked:", labelText);
+                return;
             }
-        }
-
-        if (!matched) {
-            console.warn(`[Filla] ⚠️ Radio no match: name="${radios[0]?.name}" for value "${value}"`);
         }
     }
 
@@ -131,12 +140,44 @@
         }
     }
 
-    function normalizeValue(key, value) {
+    function normalizeValue(key, value, el) {
         if (!value) return value;
 
-        const v = value.toLowerCase();
+        // 🔥 Salary handling (context-aware)
+        if (key === "min_salary") {
+            const num = Number(value);
+            if (isNaN(num)) return value;
 
+            const type = (el.getAttribute("type") || "").toLowerCase();
+            const placeholder = (el.placeholder || "").toLowerCase();
+            const label = (el.labels?.[0]?.innerText || "").toLowerCase();
+
+            // ✅ number input → raw number
+            if (type === "number") return num;
+
+            // ✅ detect numeric expectation
+            if (placeholder.includes("number") || label.includes("amount")) {
+                return num;
+            }
+
+            // ✅ default → human readable
+            return (num / 100000).toFixed(0) + " LPA";
+        }
+
+        if (key === "experience") {
+  const type = (el.getAttribute("type") || "").toLowerCase();
+
+  if (type === "number") {
+    // Only full-time experience (exclude internships)
+    return 0;
+  }
+
+  return value;
+}
+
+        // 🔥 Notice period normalization
         if (key === "notice_period") {
+            const v = String(value).toLowerCase();
             if (v.includes("immediate")) return "can join immediately";
         }
 
@@ -146,8 +187,8 @@
     // ─── Core: Process one field ───────────────────────────────────────────────
     function processField(el, userData) {
 
-        const tag = el.tagName.toLowerCase();
         const type = (el.getAttribute("type") || "text").toLowerCase();
+        const tag = el.tagName.toLowerCase();
 
         if (type === "file") {
             console.log("[Filla] 🚫 Skipping file input");
@@ -173,7 +214,7 @@
         }
 
         let value = FM.resolveValue(key, userData);
-        value = normalizeValue(key, value);
+        value = normalizeValue(key, value, el);
 
         console.log("[Filla] Matching:", { key, value });
 
@@ -215,7 +256,7 @@
             if (!key) continue;
 
             let value = FM.resolveValue(key, userData);
-            value = normalizeValue(key, value);
+            value = normalizeValue(key, value, el);
 
             console.log("[Filla] Matching:", { key, value });
 
@@ -235,13 +276,51 @@
             "textarea," +
             "select"
         );
+        const customFields = document.querySelectorAll(
+            '[role="combobox"], [role="button"], [aria-haspopup="listbox"]'
+        );
 
         fields.forEach(el => processField(el, userData));
+        customFields.forEach(el => handleCustomField(el, userData));
 
         // Radio groups
         processRadioGroups(userData);
 
         console.log("[Filla] ✅ Autofill complete.");
+    }
+
+    function handleCustomField(el, userData) {
+        const text = (el.innerText || "").toLowerCase();
+
+        console.log("[Filla] 🔍 Custom field:", text);
+
+        // 🔥 Salary (LPA dropdown style)
+        if (text.includes("salary")) {
+            const value = userData.profile?.min_salary;
+
+            if (!value) return;
+
+            const lpa = (Number(value) / 100000).toFixed(0);
+
+            el.click();
+
+            setTimeout(() => {
+                const options = document.querySelectorAll('[role="option"], div');
+
+                options.forEach(opt => {
+                    if (opt.innerText.includes(lpa)) {
+                        opt.click();
+                    }
+                });
+            }, 500);
+        }
+
+        // 🔥 Work mode
+        if (text.includes("work")) {
+            if (text.includes("remote")) {
+                el.click();
+            }
+        }
     }
 
     // ─── Message Listener ─────────────────────────────────────────────────────

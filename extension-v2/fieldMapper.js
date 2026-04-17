@@ -17,7 +17,8 @@
         phone: ["phone", "mobile", "cell", "contact number", "telephone", "tel", "whatsapp"],
         gender: ["gender", "sex"],
         role: ["role", "job title", "position", "designation", "title", "current role", "applying for"],
-        experience: ["experience", "years of experience", "exp", "experience level", "work experience"],
+        experience: ["experience", "years of experience", "exp", "experience level", "work experience", "full time experience"],
+        internship_experience: ["internship", "internship experience", "intern experience", "months"],
         current_ctc: ["current ctc", "current salary", "current compensation", "present salary", "existing ctc"],
         min_salary: ["expected salary", "expected ctc", "desired salary", "desired Pay", "salary expectation", "minimum salary", "target salary", "min salary", "package"],
         notice_period: ["notice period", "notice", "joining", "availability", "when can you join", "start date"],
@@ -36,31 +37,68 @@
 
     // ─── Profile Value Resolver ────────────────────────────────────────────────
     function resolveValue(key, userData) {
-        const p = userData.profile;
+        const p = userData.profile || {};
         const loc = p.location || {};
+
+        // 🔥 Calculate internship months safely
+        function getInternshipMonths() {
+            const exp = p.work_experience || [];
+            let totalMonths = 0;
+
+            exp.forEach(e => {
+                if (!e?.title) return;
+
+                if (e.title.toLowerCase().includes("intern")) {
+                    const start = new Date(e.start_date);
+                    const end = e.is_current ? new Date() : new Date(e.end_date);
+
+                    if (isNaN(start) || isNaN(end)) return;
+
+                    const months =
+                        (end.getFullYear() - start.getFullYear()) * 12 +
+                        (end.getMonth() - start.getMonth());
+
+                    totalMonths += Math.max(months, 0);
+                }
+            });
+
+            return totalMonths;
+        }
 
         const valueMap = {
             first_name: p.first_name,
             last_name: p.last_name,
-            full_name: `${p.first_name} ${p.last_name}`,
+            full_name: `${p.first_name || ""} ${p.last_name || ""}`.trim(),
             preferred_name: p.preferred_name,
             email: userData.email,
             phone: p.phone,
             gender: p.gender,
             role: p.role,
-            experience: p.experience_level,
-            current_ctc: String(p.current_ctc),
-            min_salary: String(p.min_salary),
+
+            // 🔥 FIXED: don't return "entry"
+            experience: 0, // full-time only (correct for your profile)
+
+            internship_experience: getInternshipMonths(),
+
+            current_ctc: p.current_ctc,   // keep raw
+            min_salary: p.min_salary,     // keep raw
+
             notice_period: p.notice_period,
+
             city: loc.city,
             state: loc.state,
             pincode: loc.pincode,
             country: loc.country,
             address: p.address,
+
             skills: Array.isArray(p.skills)
                 ? p.skills.map(s => s.name || s).join(", ")
                 : p.skills,
-            languages: Array.isArray(p.languages) ? p.languages.join(", ") : p.languages,
+
+            languages: Array.isArray(p.languages)
+                ? p.languages.join(", ")
+                : p.languages,
+
             linkedin: p.links?.linkedin,
             github: p.links?.github,
             portfolio: p.links?.portfolio,
@@ -68,7 +106,6 @@
 
         return valueMap[key] ?? null;
     }
-
     // ─── Normalize text helper ─────────────────────────────────────────────────
     function normalize(str) {
         if (!str) return "";
@@ -120,7 +157,8 @@
 
         for (const [key, keywords] of Object.entries(KEYWORD_MAP)) {
             for (const kw of keywords) {
-                if (fingerprint.includes(kw)) {
+                if (fingerprint.includes(kw) ||
+                    kw.includes(fingerprint)) {
                     // Prefer longer keyword matches (more specific)
                     if (kw.length > bestScore) {
                         bestScore = kw.length;
