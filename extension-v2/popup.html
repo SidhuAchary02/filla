@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Filla Autofill</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    /* ── Design tokens ─────────────────────────────────────────────── */
+    :root {
+      --bg:          #0a0a0f;
+      --surface:     #111118;
+      --surface-2:   #1a1a26;
+      --border:      rgba(255,255,255,0.07);
+      --border-glow: rgba(99,102,241,0.35);
+      --accent:      #6366f1;
+      --accent-2:    #8b5cf6;
+      --accent-glow: rgba(99,102,241,0.18);
+      --text:        #f1f1f6;
+      --text-sub:    rgba(241,241,246,0.5);
+      --text-mute:   rgba(241,241,246,0.28);
+      --success:     #34d399;
+      --danger:      #f87171;
+      --radius:      12px;
+      --radius-lg:   18px;
+      --transition:  0.22s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    /* ── Reset ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 340px;
+      min-height: 420px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "DM Sans", sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      overflow: hidden;
+    }
+
+    /* ── Shell ─────────────────────────────────────────────────────── */
+    .shell {
+      width: 340px;
+      min-height: 420px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Ambient gradient orbs */
+    .shell::before {
+      content: "";
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 200px; height: 200px;
+      background: radial-gradient(circle, rgba(99,102,241,0.22) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .shell::after {
+      content: "";
+      position: absolute;
+      bottom: -40px; left: -40px;
+      width: 160px; height: 160px;
+      background: radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* ── View switching ────────────────────────────────────────────── */
+    .view {
+      position: absolute;
+      inset: 0;
+      padding: 28px 24px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      transition: opacity var(--transition), transform var(--transition);
+    }
+    .view.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(10px);
+    }
+    .view.visible {
+      opacity: 1;
+      pointer-events: all;
+      transform: translateY(0);
+    }
+
+    /* ── Logo mark ─────────────────────────────────────────────────── */
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 4px;
+    }
+    .logo-mark {
+      width: 28px; height: 28px;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      font-size: 13px;
+      color: #fff;
+      letter-spacing: -0.5px;
+      flex-shrink: 0;
+    }
+    .logo-text {
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 0.3px;
+      color: var(--text);
+    }
+
+    /* ── Login view specifics ──────────────────────────────────────── */
+    .login-title {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      font-size: 22px;
+      letter-spacing: -0.5px;
+      color: var(--text);
+      line-height: 1.2;
+    }
+    .login-sub {
+      font-size: 13px;
+      color: var(--text-sub);
+      margin-top: 4px;
+      line-height: 1.5;
+    }
+
+    /* ── Form elements ─────────────────────────────────────────────── */
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .field label {
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-mute);
+    }
+    .field input {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 13px;
+      font-family: "DM Sans", sans-serif;
+      font-size: 13.5px;
+      color: var(--text);
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+    .field input::placeholder { color: var(--text-mute); }
+    .field input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    /* ── Buttons ───────────────────────────────────────────────────── */
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 11px 16px;
+      border-radius: var(--radius);
+      border: none;
+      font-family: "DM Sans", sans-serif;
+      font-size: 13.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background var(--transition), opacity var(--transition),
+                  transform 0.1s ease, box-shadow var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+    .btn:active { transform: scale(0.98); }
+
+    /* Primary */
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+      color: #fff;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      box-shadow: 0 4px 20px rgba(99,102,241,0.28);
+    }
+    .btn-primary:hover {
+      box-shadow: 0 6px 28px rgba(99,102,241,0.42);
+      opacity: 0.93;
+    }
+    .btn-primary:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    /* Secondary */
+    .btn-secondary {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover {
+      background: #1e1e2e;
+      border-color: rgba(255,255,255,0.14);
+    }
+
+    /* Ghost / Danger */
+    .btn-ghost {
+      background: transparent;
+      color: var(--danger);
+      border: 1px solid rgba(248,113,113,0.2);
+      font-size: 12.5px;
+      padding: 8px 14px;
+    }
+    .btn-ghost:hover {
+      background: rgba(248,113,113,0.07);
+      border-color: rgba(248,113,113,0.4);
+    }
+
+    /* Disabled muted */
+    .btn-muted {
+      background: var(--surface-2);
+      color: var(--text-mute);
+      border: 1px solid var(--border);
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    /* ── Error / Toast messages ─────────────────────────────────────── */
+    .msg {
+      font-size: 12px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      display: none;
+    }
+    .msg.error {
+      background: rgba(248,113,113,0.1);
+      border: 1px solid rgba(248,113,113,0.25);
+      color: #f87171;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .msg.success {
+      background: rgba(52,211,153,0.1);
+      border: 1px solid rgba(52,211,153,0.25);
+      color: #34d399;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .msg.hidden { display: none !important; }
+
+    /* ── Dashboard header ───────────────────────────────────────────── */
+    .dash-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 5px 12px 5px 6px;
+    }
+    .avatar {
+      width: 22px; height: 22px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      font-size: 10px;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .user-email {
+      font-size: 11.5px;
+      color: var(--text-sub);
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ── Dashboard CTA section ──────────────────────────────────────── */
+    .dash-cta {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .cta-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-mute);
+      font-weight: 500;
+    }
+
+    /* ── Action grid ─────────────────────────────────────────────────── */
+    .action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    /* ── Divider ─────────────────────────────────────────────────────── */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 0 -24px;
+    }
+
+    /* ── Status dot ─────────────────────────────────────────────────── */
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 6px var(--success);
+      flex-shrink: 0;
+    }
+
+    /* ── Spinner ─────────────────────────────────────────────────────── */
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    .btn.loading .spinner { display: block; }
+    .btn.loading .btn-label { opacity: 0.5; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Pulse animation for autofill btn ───────────────────────────── */
+    @keyframes pulse-border {
+      0%, 100% { box-shadow: 0 4px 20px rgba(99,102,241,0.28); }
+      50%       { box-shadow: 0 4px 28px rgba(99,102,241,0.55), 0 0 0 4px rgba(99,102,241,0.12); }
+    }
+    #autofill-btn:not(:disabled) {
+      animation: pulse-border 3s ease-in-out infinite;
+    }
+    #autofill-btn:hover {
+      animation: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         VIEW 1 — LOGIN
+    ═══════════════════════════════════════════════════════════════ -->
+    <div id="view-login" class="view hidden">
+      <div class="logo">
+        <div class="logo-mark">F</div>
+        <span class="logo-text">Filla</span>
+      </div>
+
+      <div>
+        <h1 class="login-title">LOGIN</h1>
+        <p class="login-sub">Sign in with your Filla account to auto-fill forms.</p>
+      </div>
+
+      <div class="field-group">
+        <div class="field">
+          <label for="input-email">Email</label>
+          <input
+            id="input-email"
+            type="email"
+            placeholder="you@example.com"
+            autocomplete="email"
+          />
+        </div>
+        <div class="field">
+          <label for="input-password">Password</label>
+          <input
+            id="input-password"
+            type="password"
+            placeholder="••••••••"
+            autocomplete="current-password"
+          />
+        </div>
+      </div>
+
+      <div id="login-error" class="msg error hidden">
+        <span>⚠</span>
+        <span id="login-error-text">Invalid credentials.</span>
+      </div>
+
+      <button id="signin-btn" class="btn btn-primary">
+        <div class="spinner"></div>
+        <span class="btn-label">Sign In</span>
+      </button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         VIEW 2 — DASHBOARD
+    ═══════════════════════════════════════════════════════════════ -->
+    <div id="view-dashboard" class="view hidden">
+      <!-- Header row -->
+      <div class="dash-header">
+        <div class="logo">
+          <div class="logo-mark">F</div>
+          <span class="logo-text">Filla Autofill</span>
+        </div>
+        <button id="logout-btn" class="btn btn-ghost" style="width:auto; padding: 7px 13px; font-size:12px;">
+          Logout
+        </button>
+      </div>
+
+      <!-- User pill -->
+      <div class="user-pill">
+        <div class="avatar" id="user-avatar">S</div>
+        <span class="user-email" id="user-email-display">—</span>
+        <div class="status-dot" style="margin-left:auto;"></div>
+      </div>
+
+      <!-- CTA card -->
+      <div class="dash-cta">
+        <span class="cta-label">Ready to fill</span>
+        <button id="autofill-btn" class="btn btn-primary">
+          <div class="spinner"></div>
+          <span class="btn-label">⚡ Auto-fill Current Form</span>
+        </button>
+      </div>
+
+      <!-- Feedback message -->
+      <div id="autofill-msg" class="msg hidden"></div>
+
+      <!-- Action grid -->
+      <div class="action-grid">
+        <button id="manage-profile-btn" class="btn btn-secondary" style="font-size:12.5px; padding:10px 10px;">
+          👤 Manage Profile
+        </button>
+        <button class="btn btn-muted" disabled style="font-size:12.5px; padding:10px 10px;">
+          ☁ Sync Profile
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

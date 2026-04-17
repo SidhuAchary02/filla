@@ -96,9 +96,8 @@ function SectionCard({ title, children, action }) {
 }
 
 function Dashboard() {
-  const { user, logout, getToken } = useAuth()
+  const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const token = getToken()
   const profile = user?.profile || {}
   const skills = Array.isArray(profile.skills) ? profile.skills : []
   const workExperience = Array.isArray(profile.work_experience) ? profile.work_experience : []
@@ -107,6 +106,9 @@ function Dashboard() {
   const languages = Array.isArray(profile.languages) ? profile.languages : []
   const location = profile.location || {}
   const links = profile.links || {}
+
+  // Get auth token
+  const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
 
   // Drawer state
   const [openDrawer, setOpenDrawer] = useState(null)

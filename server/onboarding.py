@@ -145,15 +145,11 @@ def _compute_normalized_profile(profile: dict) -> dict:
         ...
       }
     }
-    
-    IMPORTANT: If a skill has an explicit 'experience' field, use that directly.
-    Only calculate from work_experience if experience is not explicitly set.
     """
     skills = profile.get("skills") or []
     work_experience = profile.get("work_experience") or []
     notice_period = profile.get("notice_period") or "immediate"
 
-    # Pass full skill dicts to normalize_profile so it can access explicit experience values
     normalized = normalize_profile(skills, work_experience)
     normalized["notice_period"] = notice_period
     return normalized
@@ -190,11 +186,11 @@ async def submit_onboarding(
         }
 
         # Compute normalized_profile from work_experience + skills
-        # Extract skill names for normalization (from dicts, not SkillModel objects)
+        # Extract skill names for normalization
         skills_for_normalization = [
-            skill.get("name") 
-            for skill in payload["skills"]
-        ] if payload["skills"] else []
+            skill.get("name") if isinstance(skill, dict) else skill.name 
+            for skill in request.skills
+        ] if request.skills else []
         
         profile_for_normalization = {
             "skills": skills_for_normalization,
@@ -360,18 +356,19 @@ async def update_personal_info(
             # Get current profile to fill in any missing fields
             current = _get_profile_by_user_id(user_id)
             
-            # Convert skill objects to dicts for normalization (preserving experience field)
+            # Extract skill names from skill objects for normalization
             skills_for_normalization = []
             if request.skills is not None:
-                # Convert SkillModel objects to dicts
                 skills_for_normalization = [
-                    _to_dict(skill) if hasattr(skill, 'model_dump') else skill
+                    skill.get("name") if isinstance(skill, dict) else skill.name 
                     for skill in request.skills
                 ]
             else:
-                # Use existing skills from current profile (already dicts)
                 current_skills = current.get("skills") or []
-                skills_for_normalization = current_skills
+                skills_for_normalization = [
+                    skill.get("name") if isinstance(skill, dict) else skill 
+                    for skill in current_skills
+                ]
             
             merged_profile = {
                 "skills": skills_for_normalization,
@@ -485,12 +482,29 @@ async def get_autofill_data(authorization: str = Header(None)):
 
     try:
         profile = _ensure_profile_exists(user_id)
+        
+        # Get email from auth user
+        user_email = None
+        try:
+            token = authorization.replace("Bearer ", "")
+            auth_user = supabase_client.auth.get_user(token)
+            if auth_user and auth_user.user:
+                user_email = getattr(auth_user.user, 'email', None)
+        except Exception as e:
+            print(f"[DEBUG] Email retrieval failed: {str(e)}")
+            user_email = None
 
         # Get normalized_profile with computed experience_years
         normalized = profile.get("normalized_profile") or {}
         if not normalized:
             # Compute on-the-fly if not in DB
             normalized = _compute_normalized_profile(profile)
+
+        # Calculate total experience in years from work_experience
+        total_experience_years = 0
+        work_exp = profile.get("work_experience") or []
+        if work_exp:
+            total_experience_years = len(work_exp)  # Simple count, or sum duration if available
 
         autofill_data = {
             "role": profile.get("role"),
@@ -505,15 +519,18 @@ async def get_autofill_data(authorization: str = Header(None)):
             "location": profile.get("location") or {},
             "resume_url": profile.get("resume_url"),
             "min_salary": profile.get("min_salary"),
-            # Extension autofill keys - NOW from normalized_profile
+            # Extension autofill keys
             "full_name": profile.get("full_name"),
-            "email": profile.get("email"),
+            "email": user_email,  # Use retrieved auth email
             "phone": profile.get("phone"),
             "first_name": profile.get("first_name"),
             "last_name": profile.get("last_name"),
             "notice_period": normalized.get("notice_period") or profile.get("notice_period"),
             "current_ctc": profile.get("current_ctc"),
             "expected_ctc": profile.get("expected_ctc") or profile.get("min_salary"),
+            "birthday": profile.get("birthday"),
+            "gender": profile.get("gender"),
+            "total_experience_years": total_experience_years,
             # KEY: Computed experience breakdown for autofill questions
             "normalized_profile": normalized
         }

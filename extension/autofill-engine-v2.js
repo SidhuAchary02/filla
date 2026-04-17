@@ -320,7 +320,20 @@ function handleNonTechQuestion(question, profile) {
     if (value) return { value, matched: true, reason: "phone" };
   }
 
-  // Location
+  // Location - be more inclusive
+  if (q.includes('location')) {
+    // Try full location object first
+    if (q.includes('preferred') && profile.location?.preferred) {
+      return { value: profile.location.preferred, matched: true, reason: "location.preferred" };
+    }
+    if (q.includes('current') && profile.location?.city) {
+      return { value: profile.location.city, matched: true, reason: "location.city" };
+    }
+    // Fallback to any location field
+    const value = profile.location?.city || profile.location?.country;
+    if (value) return { value, matched: true, reason: "location" };
+  }
+
   if (q.includes('city') || q.includes('current city')) {
     const value = profile.location?.city;
     if (value) return { value, matched: true, reason: "location.city" };
@@ -328,6 +341,42 @@ function handleNonTechQuestion(question, profile) {
   if (q.includes('country')) {
     const value = profile.location?.country;
     if (value) return { value, matched: true, reason: "location.country" };
+  }
+
+  // Date of Birth
+  if (q.includes('date of birth') || q.includes('dob') || q.includes('birthday')) {
+    const value = profile.birthday;
+    if (value) return { value, matched: true, reason: "birthday" };
+  }
+
+  // Gender
+  if (q.includes('gender') || q.includes('sex')) {
+    const value = profile.gender;
+    if (value) return { value, matched: true, reason: "gender" };
+  }
+
+  // Total Experience Years
+  if ((q.includes('experience') && (q.includes('year') || q.includes('years'))) || q.includes('total experience')) {
+    // Try to calculate total years from work_experience
+    const workExp = profile.work_experience || [];
+    let totalYears = 0;
+    
+    if (Array.isArray(workExp) && workExp.length > 0) {
+      workExp.forEach(exp => {
+        if (exp.duration_years) {
+          totalYears += parseInt(exp.duration_years) || 0;
+        }
+        if (exp.duration_months) {
+          totalYears += (parseInt(exp.duration_months) || 0) / 12;
+        }
+      });
+    }
+    
+    // Round to 1 decimal place
+    totalYears = Math.round(totalYears * 10) / 10;
+    if (totalYears > 0) {
+      return { value: totalYears, matched: true, reason: "total_experience" };
+    }
   }
 
   // Skills

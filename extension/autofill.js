@@ -4,8 +4,12 @@
   // Listen for autofill requests from popup
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "autofill") {
-      performAutofill(request.data);
-      sendResponse({ success: true });
+      const results = performAutofill(request.profileData);
+      sendResponse({ 
+        success: true, 
+        filledCount: results.filled,
+        details: results.details 
+      });
     } else if (request.action === "getFields") {
       const fields = collectCurrentFields();
       sendResponse({ fields });
@@ -138,7 +142,21 @@
     return path.join(" > ");
   }
 
-  function performAutofill(profile) {
+  function performAutofill(profileData) {
+    if (!profileData) {
+      console.error("[Filla] No profile data provided");
+      return { filled: 0, skipped: 0, failed: 0, details: [] };
+    }
+
+    console.log("[Filla] Profile data received:", {
+      first_name: profileData.first_name,
+      last_name: profileData.last_name,
+      email: profileData.email,
+      phone: profileData.phone,
+      skills: profileData.skills?.length || 0,
+      has_normalized_profile: !!profileData.normalized_profile
+    });
+
     const results = {
       filled: 0,
       skipped: 0,
@@ -146,66 +164,79 @@
       details: []
     };
 
-    // Iterate over ALL DOM fields and fill using processQuestionV2
     const fields = document.querySelectorAll("input, textarea, select");
+    console.log(`[Filla] Found ${fields.length} total form fields`);
 
-    fields.forEach((field) => {
-      const question = extractQuestion(field);
-      const fieldType = getFieldType(field);
-
-      // Skip if field is not visible or capable
+    for (const field of fields) {
       if (!isAutofillCapable(field)) {
-        return;
+        continue;
       }
 
-      // Use processQuestionV2 to get the value for this question
-      if (typeof processQuestionV2 !== 'undefined') {
-        const result = processQuestionV2(question, profile);
+      const fieldQuestion = extractQuestion(field);
+      const fieldType = getFieldType(field);
+      console.log(`[Filla] Processing field: "${fieldQuestion}" (type: ${fieldType})`);
 
-        if (!result.matched || result.value === null) {
-          results.skipped += 1;
-          results.details.push({
-            question: question,
-            type: fieldType,
-            status: "skipped",
+      // Try to get value using processQuestionV2 (intelligent matching)
+      let value = null;
+      let matched = false;
+
+      if (typeof processQuestionV2 === 'function') {
+        try {
+          const result = processQuestionV2(fieldQuestion, profileData);
+          console.log(`[Filla]   → processQuestionV2 result:`, {
+            matched: result.matched,
+            value: result.value,
             reason: result.reason
           });
-          return;
-        }
-
-        try {
-          fillField(field, result.value, fieldType);
-          results.filled += 1;
-          results.details.push({
-            question: question,
-            type: fieldType,
-            status: "filled",
-            value: String(result.value).substring(0, 50)
-          });
-          console.log(`[Filla] ✓ Filled: "${question}" → ${result.value}`);
+          
+          if (result.matched && result.value !== null) {
+            value = result.value;
+            matched = true;
+            console.log(`[Filla] ✓ Matched "${fieldQuestion}" → ${value}`);
+          }
         } catch (err) {
-          results.failed += 1;
-          results.details.push({
-            question: question,
-            type: fieldType,
-            status: "failed",
-            error: err.message
-          });
-          console.error(`[Filla] ✗ Failed to fill: "${question}"`, err);
+          console.warn(`[Filla] processQuestionV2 error for "${fieldQuestion}":`, err.message);
         }
       } else {
+        console.warn("[Filla] processQuestionV2 is not a function!");
+      }
+
+      if (!matched) {
+        console.log(`[Filla] ✗ No match for "${fieldQuestion}"`);
+        results.skipped += 1;
+        results.details.push({
+          question: fieldQuestion,
+          type: fieldType,
+          status: "skipped"
+        });
+        continue;
+      }
+
+      // Fill the field
+      try {
+        fillField(field, value, fieldType);
+        results.filled += 1;
+        results.details.push({
+          question: fieldQuestion,
+          type: fieldType,
+          status: "filled",
+          value: String(value).substring(0, 50)
+        });
+        console.log(`[Filla] ✓ Filled: "${fieldQuestion}"`);
+      } catch (err) {
         results.failed += 1;
         results.details.push({
-          question: question,
+          question: fieldQuestion,
           type: fieldType,
           status: "failed",
-          error: "processQuestionV2 not available"
+          error: err.message
         });
-        console.warn("[Filla] processQuestionV2 function not found - ensure autofill-engine-v2.js is loaded");
+        console.error(`[Filla] ✗ Failed to fill "${fieldQuestion}":`, err);
       }
-    });
+    }
 
-    console.log("[Filla] Autofill Results:", results);
+    console.log(`[Filla] Autofill complete: ${results.filled} filled, ${results.skipped} skipped, ${results.failed} failed`);
+    console.log("[Filla] Detailed results:", results.details);
     return results;
   }
 
@@ -226,8 +257,31 @@
       console.warn("File inputs require manual selection due to browser security");
     } else if (type === "textarea") {
       field.value = String(value);
+    } else if (type === "number") {
+      // Convert notice period strings to numbers
+      let numValue = value;
+      
+      if (typeof value === 'string') {
+        const lowerValue = value.toLowerCase();
+        
+        // Notice period mappings
+        if (lowerValue === 'immediate' || lowerValue === 'asap' || lowerValue === '0 days') {
+          numValue = 0;
+        } else if (lowerValue.includes('week')) {
+          const num = parseInt(lowerValue);
+          numValue = isNaN(num) ? 7 : num * 7;
+        } else if (lowerValue.includes('month')) {
+          const num = parseInt(lowerValue);
+          numValue = isNaN(num) ? 30 : num * 30;
+        } else {
+          // Try to parse as number
+          numValue = parseInt(value) || value;
+        }
+      }
+      
+      field.value = String(numValue);
     } else {
-      // text, email, number, tel, url, date, time
+      // text, email, tel, url, date, time
       field.value = String(value);
     }
 

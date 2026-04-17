@@ -1,8 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getCurrentUser } from './authService'
-import { getCookie, setCookie, clearAuthCookies } from './cookieUtils'
 
 const DEFAULT_EXPIRY_MS = 4 * 24 * 60 * 60 * 1000
+
+const clearAuthStorage = () => {
+  localStorage.removeItem('auth_token')
+  localStorage.removeItem('user_id')
+  localStorage.removeItem('auth_expiry')
+  localStorage.removeItem('onboarding_complete')
+  sessionStorage.removeItem('auth_token')
+  sessionStorage.removeItem('user_id')
+}
 
 export function useAuth() {
   const [user, setUser] = useState(null)
@@ -10,23 +18,23 @@ export function useAuth() {
   const [error, setError] = useState(null)
   const logoutTimerRef = useRef(null)
 
-  // Try to restore session from cookies
+  // Try to restore session from localStorage
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const token = getCookie('auth_token')
-        const userId = getCookie('user_id')
-        const expiryRaw = getCookie('auth_expiry')
+        const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
+        const userId = localStorage.getItem('user_id') || sessionStorage.getItem('user_id')
+        const expiryRaw = localStorage.getItem('auth_expiry')
         const expiry = expiryRaw ? Number(expiryRaw) : null
 
         if (!token || !userId) {
-          clearAuthCookies()
+          clearAuthStorage()
           setUser(null)
           return
         }
 
         if (expiry && Number.isFinite(expiry) && Date.now() >= expiry) {
-          clearAuthCookies()
+          clearAuthStorage()
           setUser(null)
           return
         }
@@ -35,10 +43,11 @@ export function useAuth() {
           const userData = await getCurrentUser(token)
           setUser(userData)
 
-          const effectiveExpiry = expiry && Number.isFinite(expiry) ? expiry : (Date.now() + DEFAULT_EXPIRY_MS)
+          const isPersistentSession = Boolean(localStorage.getItem('auth_token'))
+          const effectiveExpiry = expiry && Number.isFinite(expiry) ? expiry : (isPersistentSession ? Date.now() + DEFAULT_EXPIRY_MS : null)
 
           if (effectiveExpiry) {
-            setCookie('auth_expiry', String(effectiveExpiry), { maxAge: Math.floor((effectiveExpiry - Date.now()) / 1000) })
+            localStorage.setItem('auth_expiry', String(effectiveExpiry))
           }
 
           if (logoutTimerRef.current) {
@@ -48,14 +57,14 @@ export function useAuth() {
           if (effectiveExpiry) {
             const remainingMs = Math.max(effectiveExpiry - Date.now(), 0)
             logoutTimerRef.current = window.setTimeout(() => {
-              clearAuthCookies()
+              clearAuthStorage()
               setUser(null)
             }, remainingMs)
           }
         }
       } catch (err) {
         console.error('Auth initialization error:', err)
-        clearAuthCookies()
+        clearAuthStorage()
         setUser(null)
       } finally {
         setLoading(false)
@@ -78,7 +87,7 @@ export function useAuth() {
 
   // Logout helper
   const logoutUser = useCallback(() => {
-    clearAuthCookies()
+    clearAuthStorage()
     if (logoutTimerRef.current) {
       clearTimeout(logoutTimerRef.current)
     }
@@ -87,7 +96,7 @@ export function useAuth() {
 
   // Get token helper (memoized to prevent dependency updates)
   const getToken = useCallback(() => {
-    return getCookie('auth_token')
+    return localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
   }, [])
 
   return {

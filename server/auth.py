@@ -138,36 +138,40 @@ async def signup(request: SignupRequest):
         )
 
 # ============ LOGIN ============
-@router.post("/login", response_model=AuthResponse)
+@router.post("/login")
 async def login(request: LoginRequest):
-    """
-    Login user with email and password
-    Returns JWT token
-    """
+
     try:
         response = supabase_client.auth.sign_in_with_password({
             "email": request.email,
             "password": request.password
         })
-        
-        if not response.user or not response.session:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials"
-            )
-        
-        return AuthResponse(
-            access_token=response.session.access_token,
-            token_type="bearer",
-            user_id=response.user.id
-        )
-    
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
-        )
 
+        if not response.user or not response.session:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        # ✅ FETCH PROFILE FROM DB
+        profile_res = supabase_client.table("user_profiles") \
+            .select("*") \
+            .eq("user_id", response.user.id) \
+            .single() \
+            .execute()
+
+        profile = profile_res.data if profile_res.data else {}
+
+        return {
+            "token": response.session.access_token,
+            "user": {
+                "id": response.user.id,
+                "email": response.user.email,
+                "profile": profile
+            }
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    
 # ============ GET CURRENT USER ============
 @router.get("/me", response_model=CurrentUserResponse)
 async def get_current_user(authorization: str = Header(None)):
