@@ -211,10 +211,10 @@ function CompensationDrawer({ isOpen, onClose, profile, onSave, token }) {
               type="url"
               name="resume_url"
               value={formData.resume_url}
-              onChange={handleChange}
               disabled={isLoading || isSaving}
               className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm placeholder-slate-400 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 disabled:bg-slate-50 disabled:text-slate-500"
               placeholder="https://example.com/resume.pdf"
+              readOnly
             />
             <p className="mt-1 text-xs text-slate-500">Link to your resume (Google Drive, Dropbox, etc.)</p>
           </div>
