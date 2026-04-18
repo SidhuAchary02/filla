@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "filla",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "Intelligent form autofill powered by your Filla profile.",
   "permissions": [
     "activeTab",

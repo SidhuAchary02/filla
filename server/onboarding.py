@@ -57,6 +57,9 @@ def _serialize_profile(profile: dict) -> OnboardingResponse:
         preferred_name=profile.get("preferred_name"),
         suffix_name=profile.get("suffix_name"),
         phone=profile.get("phone"),
+        phone_country_iso=profile.get("phone_country_iso"),
+        phone_country_code=profile.get("phone_country_code"),
+        phone_number=profile.get("phone_number"),
         birthday=profile.get("birthday"),
         address=profile.get("address"),
         nationality=profile.get("nationality"),
@@ -91,7 +94,7 @@ def _get_profile_by_user_id(user_id: str):
         "id,user_id,job_search_timeline,location,resume_url,"
         "current_ctc,min_salary,notice_period,"
         "first_name,middle_name,last_name,preferred_name,suffix_name,"
-        "phone,birthday,address,nationality,preferred_location,preferred_job_type,"
+        "phone,phone_country_iso,phone_country_code,phone_number,birthday,address,nationality,preferred_location,preferred_job_type,"
         "experience_level,role,work_experience,education,projects,"
         "links,skills,languages,onboarding_completed,"
         "ethnicity,work_authorized_us,work_authorized_canada,work_authorized_uk,"
@@ -300,6 +303,12 @@ async def update_personal_info(
             payload["suffix_name"] = request.suffix_name
         if request.phone is not None:
             payload["phone"] = request.phone
+        if request.phone_country_iso is not None:
+            payload["phone_country_iso"] = request.phone_country_iso
+        if request.phone_country_code is not None:
+            payload["phone_country_code"] = request.phone_country_code
+        if request.phone_number is not None:
+            payload["phone_number"] = request.phone_number
         if request.birthday is not None:
             payload["birthday"] = request.birthday
         if request.address is not None:

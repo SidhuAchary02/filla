@@ -23,6 +23,9 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   preferred_name varchar(255),
   suffix_name varchar(50),
   phone varchar(20),
+  phone_country_iso varchar(2),
+  phone_country_code varchar(8),
+  phone_number varchar(20),
   birthday date,
   address varchar(500),
   nationality varchar(255),
@@ -87,6 +90,9 @@ ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS last_name varchar(255);
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_name varchar(255);
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS suffix_name varchar(50);
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS phone varchar(20);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS phone_country_iso varchar(2);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS phone_country_code varchar(8);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS phone_number varchar(20);
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS birthday date;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS address varchar(500);
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS nationality varchar(255);

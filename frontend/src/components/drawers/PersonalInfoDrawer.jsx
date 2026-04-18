@@ -1,15 +1,35 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { getCountries, getCountryCallingCode, parsePhoneNumberFromString } from 'libphonenumber-js'
 import Drawer from '../Drawer'
 import { updateUserProfile, getUserProfile } from '../../lib/authService'
 
 function PersonalInfoDrawer({ isOpen, onClose, profile, user, onSave, token }) {
+  const parseLegacyPhone = (value) => {
+    const raw = String(value || '').trim()
+    if (!raw) return { countryCode: '', number: '' }
+
+    const compact = raw.replace(/\s+/g, ' ')
+    const parts = compact.split(' ')
+    if (parts.length > 1 && /^\+\d{1,4}$/.test(parts[0])) {
+      return { countryCode: parts[0], number: parts.slice(1).join('').replace(/\D/g, '') }
+    }
+
+    const plusMatch = compact.match(/^(\+\d{1,4})(\d{6,15})$/)
+    if (plusMatch) {
+      return { countryCode: plusMatch[1], number: plusMatch[2] }
+    }
+
+    return { countryCode: '', number: compact.replace(/\D/g, '') }
+  }
+
   const [formData, setFormData] = useState({
     first_name: '',
     middle_name: '',
     last_name: '',
     preferred_name: '',
     suffix_name: '',
-    phone: '',
+    phone_country_code: '',
+    phone_number: '',
     birthday: '',
     address: '',
     nationality: '',
@@ -25,6 +45,28 @@ function PersonalInfoDrawer({ isOpen, onClose, profile, user, onSave, token }) {
   const [locationSearch, setLocationSearch] = useState('')
   const [showNationalityDropdown, setShowNationalityDropdown] = useState(false)
   const [showLocationDropdown, setShowLocationDropdown] = useState(false)
+  const [selectedPhoneCountry, setSelectedPhoneCountry] = useState('IN')
+
+  const phoneCountryOptions = useMemo(() => {
+    const displayNames = typeof Intl !== 'undefined' && Intl.DisplayNames
+      ? new Intl.DisplayNames(['en'], { type: 'region' })
+      : null
+
+    return getCountries()
+      .map((iso2) => {
+        const name = displayNames?.of(iso2) || iso2
+        const callingCode = `+${getCountryCallingCode(iso2)}`
+        return { iso2, name, callingCode }
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [])
+
+  const getIsoFromCallingCode = (callingCode) => {
+    const normalized = String(callingCode || '').replace(/\D/g, '')
+    if (!normalized) return ''
+    const match = phoneCountryOptions.find(option => option.callingCode === `+${normalized}`)
+    return match?.iso2 || ''
+  }
   
   // Common nationalities list
   const nationalities = [
@@ -87,7 +129,8 @@ function PersonalInfoDrawer({ isOpen, onClose, profile, user, onSave, token }) {
       last_name: lastName || profileData?.last_name || '',
       preferred_name: profileData?.preferred_name || '',
       suffix_name: profileData?.suffix_name || '',
-      phone: profileData?.phone || '',
+      phone_country_code: profileData?.phone_country_code || parseLegacyPhone(profileData?.phone).countryCode,
+      phone_number: profileData?.phone_number || parseLegacyPhone(profileData?.phone).number,
       birthday: profileData?.birthday || '',
       address: profileData?.address || '',
       nationality: profileData?.nationality || '',
@@ -98,9 +141,12 @@ function PersonalInfoDrawer({ isOpen, onClose, profile, user, onSave, token }) {
       country: profileData?.location?.country || profileData?.country || '',
       pincode: profileData?.location?.pincode || profileData?.pincode || '',
     }
+
+    const isoFromProfile = profileData?.phone_country_iso || getIsoFromCallingCode(formDataToSet.phone_country_code)
     
     console.log('Populating form with:', formDataToSet)
     setFormData(formDataToSet)
+    setSelectedPhoneCountry(isoFromProfile || 'IN')
     setNationalitySearch(formDataToSet.nationality || '')
     setLocationSearch(formDataToSet.preferred_location || '')
     setError('')
@@ -132,6 +178,38 @@ function PersonalInfoDrawer({ isOpen, onClose, profile, user, onSave, token }) {
     setSuccess('')
 
     try {
+      const selectedOption = phoneCountryOptions.find(option => option.iso2 === selectedPhoneCountry)
+      const countryCode = selectedOption?.callingCode || ''
+      const phoneNumber = String(formData.phone_number || '').trim().replace(/\D/g, '')
+      const hasAnyPhonePart = Boolean(phoneNumber)
+
+      if (hasAnyPhonePart && !selectedOption) {
+        setError('Please select a country code')
+        setIsSaving(false)
+        return
+      }
+
+      if (phoneNumber && !/^\d{6,15}$/.test(phoneNumber)) {
+        setError('Phone number must contain 6 to 15 digits')
+        setIsSaving(false)
+        return
+      }
+
+      if (phoneNumber) {
+        const parsedPhone = parsePhoneNumberFromString(phoneNumber, selectedPhoneCountry)
+        if (!parsedPhone || !parsedPhone.isValid()) {
+          setError(`Invalid phone number for ${selectedOption?.name || selectedPhoneCountry}`)
+          setIsSaving(false)
+          return
+        }
+
+        if (selectedPhoneCountry === 'IN' && phoneNumber.length !== 10) {
+          setError('Indian phone numbers must be exactly 10 digits')
+          setIsSaving(false)
+          return
+        }
+      }
+
       // Validate required fields
       if (!formData.nationality?.trim()) {
         setError('Nationality is required')
@@ -156,7 +234,10 @@ function PersonalInfoDrawer({ isOpen, onClose, profile, user, onSave, token }) {
         last_name: formData.last_name || undefined,
         preferred_name: formData.preferred_name || undefined,
         suffix_name: formData.suffix_name || undefined,
-        phone: formData.phone || undefined,
+        phone_country_iso: selectedOption?.iso2 || undefined,
+        phone_country_code: countryCode || undefined,
+        phone_number: phoneNumber || undefined,
+        phone: hasAnyPhonePart ? `${countryCode} ${phoneNumber}` : undefined,
         birthday: formData.birthday || undefined,
         address: formData.address || undefined,
         nationality: formData.nationality || undefined,
@@ -217,7 +298,7 @@ function PersonalInfoDrawer({ isOpen, onClose, profile, user, onSave, token }) {
         )}
 
         {/* Info Message */}
-        {!formData.first_name && !formData.phone && !formData.birthday && (
+        {!formData.first_name && !formData.phone_number && !formData.birthday && (
           <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-700 border border-amber-200">
             💡 You can fill in your personal information here. Nationality, Preferred Location, and Job Type are required.
           </div>
@@ -288,14 +369,37 @@ function PersonalInfoDrawer({ isOpen, onClose, profile, user, onSave, token }) {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
+            <label className="block text-sm font-medium text-slate-700">Country Code</label>
+            <select
+              value={selectedPhoneCountry}
+              onChange={(e) => {
+                const iso2 = e.target.value
+                const option = phoneCountryOptions.find(item => item.iso2 === iso2)
+                setSelectedPhoneCountry(iso2)
+                setFormData(prev => ({
+                  ...prev,
+                  phone_country_code: option?.callingCode || '',
+                }))
+              }}
+              className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm placeholder-slate-400 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+            >
+              {phoneCountryOptions.map(option => (
+                <option key={option.iso2} value={option.iso2}>{option.name} ({option.callingCode})</option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="block text-sm font-medium text-slate-700">Phone Number</label>
             <input
-              type="tel"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
+              type="text"
+              name="phone_number"
+              value={formData.phone_number}
+              onChange={(e) => {
+                const digitsOnly = e.target.value.replace(/\D/g, '')
+                setFormData(prev => ({ ...prev, phone_number: digitsOnly }))
+              }}
               className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm placeholder-slate-400 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-              placeholder="+1 (555) 000-0000"
+              placeholder="9876543210"
             />
           </div>
           <div>

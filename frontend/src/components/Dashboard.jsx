@@ -74,6 +74,23 @@ function formatSalary(profile) {
   return `₹${Number(profile.min_salary).toLocaleString()}`
 }
 
+function splitPhoneParts(countryCode, number, phone) {
+  if (countryCode || number) {
+    return {
+      countryCode: countryCode || '-',
+      number: number || '-',
+    }
+  }
+
+  const raw = String(phone || '').trim()
+  if (!raw) return { countryCode: '-', number: '-' }
+  const parts = raw.split(/\s+/)
+  if (parts.length > 1 && /^\+\d{1,4}$/.test(parts[0])) {
+    return { countryCode: parts[0], number: parts.slice(1).join(' ') }
+  }
+  return { countryCode: '-', number: raw }
+}
+
 function InfoItem({ label, value }) {
   return (
     <div className="space-y-1">
@@ -117,6 +134,11 @@ function Dashboard() {
   // Use refreshed profile if available, otherwise use user profile
   const displayProfile = refreshedProfile || profile
   const displayLocation = displayProfile?.location || {}
+  const displayPhone = splitPhoneParts(
+    displayProfile?.phone_country_code,
+    displayProfile?.phone_number,
+    displayProfile?.phone,
+  )
 
   const handleDrawerOpen = (drawerName) => {
     setOpenDrawer(drawerName)
@@ -453,7 +475,8 @@ function Dashboard() {
                 <InfoItem label="Preferred Name" value={displayProfile.preferred_name || '-'} />
                 <InfoItem label="Suffix Name" value={displayProfile.suffix_name || '-'} />
                 <InfoItem label="Email Address" value={user?.email || 'Not provided'} />
-                <InfoItem label="Phone Number" value={displayProfile.phone || '-'} />
+                <InfoItem label="Phone Country Code" value={displayPhone.countryCode} />
+                <InfoItem label="Phone Number" value={displayPhone.number} />
                 <InfoItem label="Birthday" value={displayProfile.birthday || '-'} />
                 <InfoItem label="Location" value={[displayLocation.city, displayLocation.state, displayLocation.country].filter(Boolean).join(', ') || '-'} />
                 <InfoItem label="Address" value={displayProfile.address || '-'} />

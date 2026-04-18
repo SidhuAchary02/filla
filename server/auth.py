@@ -14,7 +14,7 @@ def ensure_profile_exists(user_id: str):
         "id,user_id,job_search_timeline,location,resume_url,"
         "current_ctc,min_salary,notice_period,"
         "first_name,middle_name,last_name,preferred_name,suffix_name,"
-        "phone,birthday,address,nationality,preferred_location,preferred_job_type,"
+        "phone,phone_country_iso,phone_country_code,phone_number,birthday,address,nationality,preferred_location,preferred_job_type,"
         "experience_level,role,work_experience,education,projects,"
         "links,skills,languages,onboarding_completed,"
         "ethnicity,work_authorized_us,work_authorized_canada,work_authorized_uk,"
@@ -50,7 +50,7 @@ def ensure_profile_exists(user_id: str):
         "id,user_id,job_search_timeline,location,resume_url,"
         "current_ctc,min_salary,notice_period,"
         "first_name,middle_name,last_name,preferred_name,suffix_name,"
-        "phone,birthday,address,nationality,preferred_location,preferred_job_type,"
+        "phone,phone_country_iso,phone_country_code,phone_number,birthday,address,nationality,preferred_location,preferred_job_type,"
         "experience_level,role,work_experience,education,projects,"
         "links,skills,languages,onboarding_completed,"
         "ethnicity,work_authorized_us,work_authorized_canada,work_authorized_uk,"
@@ -214,6 +214,9 @@ async def get_current_user(authorization: str = Header(None)):
             preferred_name=profile_data.get("preferred_name"),
             suffix_name=profile_data.get("suffix_name"),
             phone=profile_data.get("phone"),
+            phone_country_iso=profile_data.get("phone_country_iso"),
+            phone_country_code=profile_data.get("phone_country_code"),
+            phone_number=profile_data.get("phone_number"),
             birthday=profile_data.get("birthday"),
             address=profile_data.get("address"),
             nationality=profile_data.get("nationality"),

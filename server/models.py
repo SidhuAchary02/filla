@@ -84,6 +84,9 @@ class PersonalInfoRequest(BaseModel):
     preferred_name: Optional[str] = None
     suffix_name: Optional[str] = None
     phone: Optional[str] = None
+    phone_country_iso: Optional[str] = None
+    phone_country_code: Optional[str] = None
+    phone_number: Optional[str] = None
     birthday: Optional[str] = None  # ISO format: YYYY-MM-DD
     address: Optional[str] = None
     nationality: Optional[str] = None
@@ -127,6 +130,9 @@ class OnboardingResponse(BaseModel):
     preferred_name: Optional[str] = None
     suffix_name: Optional[str] = None
     phone: Optional[str] = None
+    phone_country_iso: Optional[str] = None
+    phone_country_code: Optional[str] = None
+    phone_number: Optional[str] = None
     birthday: Optional[str] = None
     address: Optional[str] = None
     nationality: Optional[str] = None
@@ -175,6 +181,9 @@ class UserProfileResponse(BaseModel):
     preferred_name: Optional[str] = None
     suffix_name: Optional[str] = None
     phone: Optional[str] = None
+    phone_country_iso: Optional[str] = None
+    phone_country_code: Optional[str] = None
+    phone_number: Optional[str] = None
     birthday: Optional[str] = None
     address: Optional[str] = None
     nationality: Optional[str] = None
