@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useAuth } from '../lib/useAuth'
 
 const highlights = [
     {
@@ -34,6 +35,8 @@ const steps = [
 ]
 
 function LandingPage() {
+    const { isAuthenticated, loading } = useAuth()
+
     return (
         <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_90%_10%,#ffceb8_0%,#f7f4ee_42%),radial-gradient(circle_at_10%_80%,#ffd56f_0%,#f7f4ee_32%)] text-[#1f1c17] font-[monospace]">
             <div className="pointer-events-none absolute -right-12 -top-24 h-80 w-80   bg-[#ff8d62] opacity-35 blur-xl" />
@@ -59,18 +62,31 @@ function LandingPage() {
                         </a>
                     </nav>
                     <div className="inline-flex flex-wrap gap-3 max-[720px]:w-full">
-                        <Link
-                            to="/login"
-                            className="  border border-[#d9cebc] bg-[color-mix(in_srgb,white_78%,transparent)] px-4 py-2.5 text-center font-bold text-[#1f1c17] transition hover:-translate-y-0.5"
-                        >
-                            Log in
-                        </Link>
-                        <Link
-                            to="/signup"
-                            className="  bg-linear-to-br from-[#da5a2a] to-[#9e2f09] px-4 py-2.5 text-center font-bold text-white shadow-[0_8px_20px_rgba(158,47,9,0.25)] transition hover:-translate-y-0.5"
-                        >
-                            Get started
-                        </Link>
+                        {!loading && (
+                            isAuthenticated ? (
+                                <Link
+                                    to="/dashboard"
+                                    className="  bg-linear-to-br from-[#da5a2a] to-[#9e2f09] px-4 py-2.5 text-center font-bold text-white shadow-[0_8px_20px_rgba(158,47,9,0.25)] transition hover:-translate-y-0.5"
+                                >
+                                    Open dashboard
+                                </Link>
+                            ) : (
+                                <>
+                                    <Link
+                                        to="/login"
+                                        className="  border border-[#d9cebc] bg-[color-mix(in_srgb,white_78%,transparent)] px-4 py-2.5 text-center font-bold text-[#1f1c17] transition hover:-translate-y-0.5"
+                                    >
+                                        Log in
+                                    </Link>
+                                    <Link
+                                        to="/signup"
+                                        className="  bg-linear-to-br from-[#da5a2a] to-[#9e2f09] px-4 py-2.5 text-center font-bold text-white shadow-[0_8px_20px_rgba(158,47,9,0.25)] transition hover:-translate-y-0.5"
+                                    >
+                                        Get started
+                                    </Link>
+                                </>
+                            )
+                        )}
                     </div>
                 </div>
             </header>
@@ -89,18 +105,31 @@ function LandingPage() {
                         Filla is your application co-pilot for faster, cleaner submissions.
                     </p>
                     <div className="mt-6 inline-flex flex-wrap gap-3">
-                        <Link
-                            to="/signup"
-                            className="  bg-linear-to-br from-[#da5a2a] to-[#9e2f09] px-5 py-3 text-[0.98rem] font-bold text-white shadow-[0_8px_20px_rgba(158,47,9,0.25)] transition hover:-translate-y-0.5"
-                        >
-                            Create free account
-                        </Link>
-                        <Link
-                            to="/dashboard"
-                            className="  border border-[#d9cebc] bg-[color-mix(in_srgb,white_78%,transparent)] px-5 py-3 text-[0.98rem] font-bold text-[#1f1c17] transition hover:-translate-y-0.5"
-                        >
-                            Open dashboard
-                        </Link>
+                        {!loading && (
+                            isAuthenticated ? (
+                                <Link
+                                    to="/dashboard"
+                                    className="  bg-linear-to-br from-[#da5a2a] to-[#9e2f09] px-5 py-3 text-[0.98rem] font-bold text-white shadow-[0_8px_20px_rgba(158,47,9,0.25)] transition hover:-translate-y-0.5"
+                                >
+                                    Open dashboard
+                                </Link>
+                            ) : (
+                                <>
+                                    <Link
+                                        to="/signup"
+                                        className="  bg-linear-to-br from-[#da5a2a] to-[#9e2f09] px-5 py-3 text-[0.98rem] font-bold text-white shadow-[0_8px_20px_rgba(158,47,9,0.25)] transition hover:-translate-y-0.5"
+                                    >
+                                        Create free account
+                                    </Link>
+                                    <Link
+                                        to="/login"
+                                        className="  border border-[#d9cebc] bg-[color-mix(in_srgb,white_78%,transparent)] px-5 py-3 text-[0.98rem] font-bold text-[#1f1c17] transition hover:-translate-y-0.5"
+                                    >
+                                        Log in
+                                    </Link>
+                                </>
+                            )
+                        )}
                     </div>
                     <div className="mt-8 grid grid-cols-3 gap-3 max-[1024px]:grid-cols-2 max-[720px]:grid-cols-1">
                         <article className="  border border-[#d9cebc] bg-[color-mix(in_srgb,#fffdf8_88%,white)] p-4 backdrop-blur-md">
@@ -162,18 +191,31 @@ function LandingPage() {
                         Ready to spend less time filling forms and more time landing interviews?
                     </h2>
                     <div className="mt-4 inline-flex flex-wrap gap-3">
-                        <Link
-                            to="/signup"
-                            className="  bg-linear-to-br from-[#da5a2a] to-[#9e2f09] px-5 py-3 text-[0.98rem] font-bold text-white shadow-[0_8px_20px_rgba(158,47,9,0.25)] transition hover:-translate-y-0.5"
-                        >
-                            Start with Filla
-                        </Link>
-                        <Link
-                            to="/login"
-                            className="  border border-[#d9cebc] bg-[color-mix(in_srgb,white_78%,transparent)] px-5 py-3 text-[0.98rem] font-bold text-[#1f1c17] transition hover:-translate-y-0.5"
-                        >
-                            I already have an account
-                        </Link>
+                        {!loading && (
+                            isAuthenticated ? (
+                                <Link
+                                    to="/dashboard"
+                                    className="  bg-linear-to-br from-[#da5a2a] to-[#9e2f09] px-5 py-3 text-[0.98rem] font-bold text-white shadow-[0_8px_20px_rgba(158,47,9,0.25)] transition hover:-translate-y-0.5"
+                                >
+                                    Open dashboard
+                                </Link>
+                            ) : (
+                                <>
+                                    <Link
+                                        to="/signup"
+                                        className="  bg-linear-to-br from-[#da5a2a] to-[#9e2f09] px-5 py-3 text-[0.98rem] font-bold text-white shadow-[0_8px_20px_rgba(158,47,9,0.25)] transition hover:-translate-y-0.5"
+                                    >
+                                        Start with Filla
+                                    </Link>
+                                    <Link
+                                        to="/login"
+                                        className="  border border-[#d9cebc] bg-[color-mix(in_srgb,white_78%,transparent)] px-5 py-3 text-[0.98rem] font-bold text-[#1f1c17] transition hover:-translate-y-0.5"
+                                    >
+                                        I already have an account
+                                    </Link>
+                                </>
+                            )
+                        )}
                     </div>
                 </section>
             </main>

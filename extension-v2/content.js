@@ -22,7 +22,9 @@
   "use strict";
 
   if (window.__fillaV4Loaded) {
-    chrome.runtime.onMessage.addListener(handleMessage);
+    // Script already initialized in this page context.
+    // Do not register a new handler from this invocation, because
+    // early return would skip local let initializations in this scope.
     return;
   }
   window.__fillaV4Loaded = true;
@@ -30,71 +32,19 @@
   const FM = window.FillaFieldMapper;
 
   /* ═══════════════════════════════════════════════════════════════
-     FLOATING UI
+     UI STATUS (NO IN-PAGE WIDGET)
   ═══════════════════════════════════════════════════════════════ */
-  (function injectStyles() {
-    const s = document.createElement("style");
-    s.textContent = `
-      #filla-ui{position:fixed;top:20px;right:20px;width:252px;background:#111118;
-        border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:14px;
-        z-index:2147483647;font-family:'DM Sans',system-ui,sans-serif;color:#f1f1f6;
-        box-shadow:0 12px 36px rgba(0,0,0,0.6);transition:all .3s ease;font-size:13px}
-      #filla-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-      #filla-logo{width:28px;height:28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);
-        border-radius:8px;display:flex;align-items:center;justify-content:center;
-        font-weight:800;font-size:13px;color:#fff;flex-shrink:0}
-      #filla-title{font-size:13px;font-weight:600}
-      #filla-status{font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px}
-      #filla-progress{font-size:11px;color:#6366f1;min-height:14px;margin-top:4px}
-      #filla-log{margin-top:8px;max-height:90px;overflow-y:auto;font-size:10px;
-        color:rgba(255,255,255,0.38);line-height:1.7;
-        border-top:1px solid rgba(255,255,255,0.06);padding-top:6px}
-      #filla-mini-logo{width:36px;height:36px;background:linear-gradient(135deg,#6366f1,#8b5cf6);
-        border-radius:10px;display:flex;align-items:center;justify-content:center;
-        font-weight:800;font-size:14px;color:#fff;cursor:pointer;
-        box-shadow:0 6px 20px rgba(99,102,241,0.4);transition:transform .2s}
-      #filla-mini-logo:hover{transform:scale(1.08)}
-      .filla-resume-hint{margin-top:8px;padding:9px 11px;
-        background:rgba(99,102,241,0.1);border:1px dashed #6366f1;
-        border-radius:8px;font-size:12px;color:#a5b4fc;line-height:1.5}
-      .filla-resume-hint a{color:#818cf8;text-decoration:underline}
-    `;
-    document.head.appendChild(s);
-  })();
-
   let _logLines = [];
-  function getBox() {
-    let b = document.getElementById("filla-ui");
-    if (!b) { b = document.createElement("div"); b.id = "filla-ui"; document.body.appendChild(b); }
-    return b;
-  }
   function uiLog(line) {
     _logLines.push(line);
     if (_logLines.length > 14) _logLines.shift();
-    const el = document.getElementById("filla-log");
-    if (el) el.innerHTML = _logLines.join("<br>");
+    console.log(`[Filla] ${line}`);
   }
-  function showUI(status, progress = "") {
-    const box = getBox();
-    box.style.cssText = "";
-    box.innerHTML = `
-      <div id="filla-header">
-        <div id="filla-logo">F</div>
-        <div><div id="filla-title">Filla Autofill</div>
-             <div id="filla-status">${status}</div></div>
-      </div>
-      <div id="filla-progress">${progress}</div>
-      <div id="filla-log"></div>`;
-    if (_logLines.length) document.getElementById("filla-log").innerHTML = _logLines.join("<br>");
+  function showUI(_status, _progress = "") {
+    // Intentionally no-op: keep loading feedback only in popup UI.
   }
   function showMini() {
-    const box = getBox();
-    Object.assign(box.style, {
-      width:"auto", padding:"8px", borderRadius:"12px 0 0 12px",
-      right:"0px", top:"100px", cursor:"pointer"
-    });
-    box.innerHTML = `<div id="filla-mini-logo">F</div>`;
-    box.onclick = () => showUI("Ready ✨");
+    // Intentionally no-op: remove floating icon on web pages.
   }
 
   /* ═══════════════════════════════════════════════════════════════
@@ -590,19 +540,13 @@
 
     document.querySelectorAll('input[type="file"]').forEach(f => {
       highlight(f);
-      const zone = f.closest("div") || f.parentElement;
-      if (zone && !zone.querySelector(".filla-resume-hint")) {
-        const hint = document.createElement("div");
-        hint.className = "filla-resume-hint";
-        hint.innerHTML = `📎 <strong>Filla:</strong> Upload resume manually.${
-          resumeUrl
-            ? `<br><a href="${resumeUrl}" target="_blank">Open your saved resume ↗</a>`
-            : ""
-        }`;
-        zone.appendChild(hint);
-      }
+      // Do not inject any hint UI into the page.
     });
-    uiLog("📎 Resume: upload manually");
+    if (resumeUrl) {
+      uiLog("📎 Resume detected; file upload requires manual action")
+    } else {
+      uiLog("📎 Resume not found; file upload requires manual action")
+    }
   }
 
   /* ═══════════════════════════════════════════════════════════════

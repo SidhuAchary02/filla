@@ -56,7 +56,6 @@ const loginErrorText = document.getElementById("login-error-text");
 
 const logoutBtn = document.getElementById("logout-btn");
 const autofillBtn = document.getElementById("autofill-btn");
-const autofillMsg = document.getElementById("autofill-msg");
 const userEmailDisplay = document.getElementById("user-email-display");
 const userAvatar = document.getElementById("user-avatar");
 const manageProfileBtn = document.getElementById("manage-profile-btn");
@@ -86,7 +85,7 @@ function clearLoginError() {
 }
 
 function setSigninLoading(loading) {
-    signinBtn.classList.toggle("loading", loading);
+    // No visual loading indicator by request; only prevent double submit.
     signinBtn.disabled = loading;
 }
 
@@ -96,18 +95,8 @@ function populateDashboard(userData) {
     userAvatar.textContent = (userData.profile?.first_name?.[0] || userData.email[0]).toUpperCase();
 }
 
-function showAutofillMsg(type, text) {
-    autofillMsg.className = `msg ${type}`;
-    autofillMsg.innerHTML = `<span>${type === "success" ? "✓" : "⚠"}</span><span>${text}</span>`;
-    // Auto-hide after 4s
-    clearTimeout(autofillMsg._timer);
-    autofillMsg._timer = setTimeout(() => {
-        autofillMsg.classList.add("hidden");
-    }, 4000);
-}
-
 function setAutofillLoading(loading) {
-    autofillBtn.classList.toggle("loading", loading);
+    // No visual loading indicator by request; only prevent double clicks.
     autofillBtn.disabled = loading;
 }
 
@@ -180,20 +169,17 @@ logoutBtn.addEventListener("click", async () => {
     inputEmail.value = "";
     inputPassword.value = "";
     clearLoginError();
-    autofillMsg.classList.add("hidden");
     showView("login");
 });
 
 // ─── Autofill Handler ─────────────────────────────────────────────────────
 autofillBtn.addEventListener("click", async () => {
-    autofillMsg.classList.add("hidden");
     setAutofillLoading(true);
 
     const { fillaUserData } = await chrome.storage.local.get("fillaUserData");
 
     if (!fillaUserData) {
         setAutofillLoading(false);
-        showAutofillMsg("error", "No profile data found. Please log in again.");
         return;
     }
 
@@ -203,14 +189,7 @@ autofillBtn.addEventListener("click", async () => {
             setAutofillLoading(false);
 
             if (chrome.runtime.lastError) {
-                showAutofillMsg("error", "Could not reach the page. Try refreshing.");
                 return;
-            }
-
-            if (response?.success) {
-                showAutofillMsg("success", "Form filled successfully!");
-            } else {
-                showAutofillMsg("error", `Fill error: ${response?.error || "Unknown error"}`);
             }
         }
     );
