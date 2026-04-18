@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import Drawer from '../Drawer'
 import { updateUserProfile, getUserProfile } from '../../lib/authService'
+import { Pencil, X } from 'lucide-react'
 
 function EducationDrawer({ isOpen, onClose, profile, onSave, token }) {
   const [education, setEducation] = useState([])
+  const [editingIndex, setEditingIndex] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -34,6 +36,7 @@ function EducationDrawer({ isOpen, onClose, profile, onSave, token }) {
             start_date: '',
             end_date: '',
           })
+          setEditingIndex(null)
         })
         .catch(err => {
           console.error('Error fetching profile for education:', err)
@@ -52,7 +55,16 @@ function EducationDrawer({ isOpen, onClose, profile, onSave, token }) {
       return
     }
 
-    const newEducation = [...education, { ...tempEducation }]
+    let newEducation = []
+    if (editingIndex !== null) {
+      newEducation = education.map((edu, index) =>
+        index === editingIndex ? { ...tempEducation } : edu
+      )
+      setEditingIndex(null)
+    } else {
+      newEducation = [...education, { ...tempEducation }]
+    }
+
     setEducation(newEducation)
     setTempEducation({
       school: '',
@@ -62,6 +74,33 @@ function EducationDrawer({ isOpen, onClose, profile, onSave, token }) {
       end_date: '',
     })
     setError('')
+  }
+
+  const editEducation = (index) => {
+    const edu = education[index]
+    if (!edu) return
+
+    setTempEducation({
+      school: edu.school || '',
+      degree: edu.degree || '',
+      major: edu.major || '',
+      start_date: edu.start_date || '',
+      end_date: edu.end_date || '',
+    })
+    setEditingIndex(index)
+    setError('')
+    setSuccess('')
+  }
+
+  const cancelEdit = () => {
+    setEditingIndex(null)
+    setTempEducation({
+      school: '',
+      degree: '',
+      major: '',
+      start_date: '',
+      end_date: '',
+    })
   }
 
   const removeEducation = (index) => {
@@ -160,7 +199,9 @@ function EducationDrawer({ isOpen, onClose, profile, onSave, token }) {
 
         {/* Add Education Form */}
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
-          <h4 className="text-sm font-semibold text-slate-900">Add Education Entry</h4>
+          <h4 className="text-sm font-semibold text-slate-900">
+            {editingIndex !== null ? 'Edit Education Entry' : 'Add Education Entry'}
+          </h4>
           
           <input
             type="text"
@@ -208,14 +249,26 @@ function EducationDrawer({ isOpen, onClose, profile, onSave, token }) {
             />
           </div>
 
-          <button
-            type="button"
-            onClick={addEducation}
-            disabled={isLoading || isSaving}
-            className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Add Education
-          </button>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={addEducation}
+              disabled={isLoading || isSaving}
+              className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              {editingIndex !== null ? 'Update Education' : 'Add Education'}
+            </button>
+            {editingIndex !== null && (
+              <button
+                type="button"
+                onClick={cancelEdit}
+                disabled={isLoading || isSaving}
+                className="w-full px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-medium transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Cancel Edit
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Current Education Display */}
@@ -238,12 +291,21 @@ function EducationDrawer({ isOpen, onClose, profile, onSave, token }) {
                   </div>
                   <button
                     type="button"
+                    onClick={() => editEducation(index)}
+                    disabled={isSaving}
+                    className="mr-2 border border-white hover:border-blue-100 rounded-md px-2 py-1 text-xs font-medium text-cyan-700 hover:bg-cyan-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    aria-label={`Edit education entry ${index + 1}`}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => removeEducation(index)}
                     disabled={isSaving}
-                    className="text-red-600 hover:text-red-800 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="mr-2 border border-white hover:border-red-100 rounded-md px-2 py-1 font-bold hover:text-red-800 text-lg disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     aria-label={`Remove education entry ${index + 1}`}
                   >
-                    ✕
+                    <X size={14} />
                   </button>
                 </div>
               </div>
@@ -257,14 +319,14 @@ function EducationDrawer({ isOpen, onClose, profile, onSave, token }) {
             type="button"
             onClick={onClose}
             disabled={isSaving}
-            className="flex-1 px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isSaving || isLoading}
-            className="flex-1 px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium transition hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium transition hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             {isSaving ? 'Saving...' : 'Save Changes'}
           </button>

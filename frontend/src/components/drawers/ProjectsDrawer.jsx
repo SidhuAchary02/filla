@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import Drawer from '../Drawer'
 import { updateUserProfile, getUserProfile } from '../../lib/authService'
+import { Lightbulb, Pencil, X } from 'lucide-react'
 
 function ProjectsDrawer({ isOpen, onClose, profile, onSave, token }) {
   const [projects, setProjects] = useState([])
+  const [editingIndex, setEditingIndex] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -32,6 +34,7 @@ function ProjectsDrawer({ isOpen, onClose, profile, onSave, token }) {
             description: '',
             link: '',
           })
+          setEditingIndex(null)
         })
         .catch(err => {
           console.error('Error fetching profile for projects:', err)
@@ -50,7 +53,16 @@ function ProjectsDrawer({ isOpen, onClose, profile, onSave, token }) {
       return
     }
 
-    const newProject = [...projects, { ...tempProject }]
+    let newProject = []
+    if (editingIndex !== null) {
+      newProject = projects.map((proj, index) =>
+        index === editingIndex ? { ...tempProject } : proj
+      )
+      setEditingIndex(null)
+    } else {
+      newProject = [...projects, { ...tempProject }]
+    }
+
     setProjects(newProject)
     setTempProject({
       name: '',
@@ -59,6 +71,31 @@ function ProjectsDrawer({ isOpen, onClose, profile, onSave, token }) {
       link: '',
     })
     setError('')
+  }
+
+  const editProject = (index) => {
+    const proj = projects[index]
+    if (!proj) return
+
+    setTempProject({
+      name: proj.name || '',
+      role: proj.role || '',
+      description: proj.description || '',
+      link: proj.link || '',
+    })
+    setEditingIndex(index)
+    setError('')
+    setSuccess('')
+  }
+
+  const cancelEdit = () => {
+    setEditingIndex(null)
+    setTempProject({
+      name: '',
+      role: '',
+      description: '',
+      link: '',
+    })
   }
 
   const removeProject = (index) => {
@@ -151,13 +188,15 @@ function ProjectsDrawer({ isOpen, onClose, profile, onSave, token }) {
         {/* Info Message */}
         {projects.length === 0 && (
           <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-700 border border-amber-200">
-            💡 Add your projects. Fill in project name to add an entry.
+            <Lightbulb size={16}/> Add your projects. Fill in project name to add an entry.
           </div>
         )}
 
         {/* Add Project Form */}
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3 sticky top-0">
-          <h4 className="text-sm font-semibold text-slate-900">Add Project</h4>
+          <h4 className="text-sm font-semibold text-slate-900">
+            {editingIndex !== null ? 'Edit Project' : 'Add Project'}
+          </h4>
           
           <input
             type="text"
@@ -195,14 +234,26 @@ function ProjectsDrawer({ isOpen, onClose, profile, onSave, token }) {
             className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm shadow-sm placeholder-slate-400 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 disabled:bg-slate-200 disabled:text-slate-500"
           />
 
-          <button
-            type="button"
-            onClick={addProject}
-            disabled={isLoading || isSaving}
-            className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Add Project
-          </button>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={addProject}
+              disabled={isLoading || isSaving}
+              className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              {editingIndex !== null ? 'Update Project' : 'Add Project'}
+            </button>
+            {editingIndex !== null && (
+              <button
+                type="button"
+                onClick={cancelEdit}
+                disabled={isLoading || isSaving}
+                className="w-full px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-medium transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Cancel Edit
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Current Projects Display */}
@@ -233,12 +284,21 @@ function ProjectsDrawer({ isOpen, onClose, profile, onSave, token }) {
                   </div>
                   <button
                     type="button"
+                    onClick={() => editProject(index)}
+                    disabled={isSaving}
+                    className="mr-2 border border-white hover:border-blue-100 rounded-md px-2 py-1 text-xs font-medium text-cyan-700 hover:bg-cyan-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    aria-label={`Edit project entry ${index + 1}`}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => removeProject(index)}
                     disabled={isSaving}
-                    className="text-red-600 hover:text-red-800 text-lg disabled:opacity-50 disabled:cursor-not-allowed ml-2"
+                    className="mr-2 border border-white hover:border-red-100 rounded-md px-2 py-1 font-bold hover:text-red-800 text-lg disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     aria-label={`Remove project entry ${index + 1}`}
                   >
-                    ✕
+                    <X size={14} />
                   </button>
                 </div>
               </div>

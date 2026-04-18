@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import Drawer from '../Drawer'
 import { updateUserProfile, getUserProfile } from '../../lib/authService'
+import { Pencil, X } from 'lucide-react'
 
 function WorkExperienceDrawer({ isOpen, onClose, profile, onSave, token }) {
   const [workExperience, setWorkExperience] = useState([])
+  const [editingIndex, setEditingIndex] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -38,6 +40,7 @@ function WorkExperienceDrawer({ isOpen, onClose, profile, onSave, token }) {
             is_current: false,
             description: '',
           })
+          setEditingIndex(null)
         })
         .catch(err => {
           console.error('Error fetching profile for work experience:', err)
@@ -56,7 +59,16 @@ function WorkExperienceDrawer({ isOpen, onClose, profile, onSave, token }) {
       return
     }
 
-    const newWorkExp = [...workExperience, { ...tempWorkExp }]
+    let newWorkExp = []
+    if (editingIndex !== null) {
+      newWorkExp = workExperience.map((exp, index) =>
+        index === editingIndex ? { ...tempWorkExp } : exp
+      )
+      setEditingIndex(null)
+    } else {
+      newWorkExp = [...workExperience, { ...tempWorkExp }]
+    }
+
     setWorkExperience(newWorkExp)
     setTempWorkExp({
       title: '',
@@ -68,6 +80,37 @@ function WorkExperienceDrawer({ isOpen, onClose, profile, onSave, token }) {
       description: '',
     })
     setError('')
+  }
+
+  const editWorkExp = (index) => {
+    const exp = workExperience[index]
+    if (!exp) return
+
+    setTempWorkExp({
+      title: exp.title || '',
+      company: exp.company || '',
+      location: exp.location || '',
+      start_date: exp.start_date || '',
+      end_date: exp.end_date || '',
+      is_current: Boolean(exp.is_current),
+      description: exp.description || '',
+    })
+    setEditingIndex(index)
+    setError('')
+    setSuccess('')
+  }
+
+  const cancelEdit = () => {
+    setEditingIndex(null)
+    setTempWorkExp({
+      title: '',
+      company: '',
+      location: '',
+      start_date: '',
+      end_date: '',
+      is_current: false,
+      description: '',
+    })
   }
 
   const removeWorkExp = (index) => {
@@ -166,7 +209,9 @@ function WorkExperienceDrawer({ isOpen, onClose, profile, onSave, token }) {
 
         {/* Add Work Experience Form */}
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3 sticky top-0">
-          <h4 className="text-sm font-semibold text-slate-900">Add Work Experience</h4>
+          <h4 className="text-sm font-semibold text-slate-900">
+            {editingIndex !== null ? 'Edit Work Experience' : 'Add Work Experience'}
+          </h4>
           
           <input
             type="text"
@@ -238,14 +283,26 @@ function WorkExperienceDrawer({ isOpen, onClose, profile, onSave, token }) {
             className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm shadow-sm placeholder-slate-400 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 disabled:bg-slate-200 disabled:text-slate-500 resize-none"
           />
 
-          <button
-            type="button"
-            onClick={addWorkExp}
-            disabled={isLoading || isSaving}
-            className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Add Experience
-          </button>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={addWorkExp}
+              disabled={isLoading || isSaving}
+              className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              {editingIndex !== null ? 'Update Experience' : 'Add Experience'}
+            </button>
+            {editingIndex !== null && (
+              <button
+                type="button"
+                onClick={cancelEdit}
+                disabled={isLoading || isSaving}
+                className="w-full px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-medium transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Cancel Edit
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Current Work Experience Display */}
@@ -274,12 +331,21 @@ function WorkExperienceDrawer({ isOpen, onClose, profile, onSave, token }) {
                   </div>
                   <button
                     type="button"
+                    onClick={() => editWorkExp(index)}
+                    disabled={isSaving}
+                    className="mr-2 border border-white hover:border-blue-100 rounded-md px-2 py-1 text-xs font-medium text-cyan-700 hover:bg-cyan-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    aria-label={`Edit work experience entry ${index + 1}`}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => removeWorkExp(index)}
                     disabled={isSaving}
-                    className="text-red-600 hover:text-red-800 text-lg disabled:opacity-50 disabled:cursor-not-allowed ml-2"
+                    className="mr-2 border border-white hover:border-red-100 rounded-md px-2 py-1 font-bold hover:text-red-800 text-lg disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     aria-label={`Remove work experience entry ${index + 1}`}
                   >
-                    ✕
+                    <X size={14} />
                   </button>
                 </div>
               </div>
@@ -293,14 +359,14 @@ function WorkExperienceDrawer({ isOpen, onClose, profile, onSave, token }) {
             type="button"
             onClick={onClose}
             disabled={isSaving}
-            className="flex-1 px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isSaving || isLoading}
-            className="flex-1 px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium transition hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium transition hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             {isSaving ? 'Saving...' : 'Save Changes'}
           </button>

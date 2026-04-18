@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Drawer from '../Drawer'
 import { updateUserProfile, getUserProfile } from '../../lib/authService'
+import { Lightbulb } from 'lucide-react'
 
 function isValidUrl(string) {
   try {
@@ -162,9 +163,9 @@ function LinksDrawer({ isOpen, onClose, profile, onSave, token }) {
   }
 
   const linkTypes = [
-    { key: 'linkedin', label: 'LinkedIn', placeholder: 'https://linkedin.com/in/yourprofile', icon: '💼' },
-    { key: 'github', label: 'GitHub', placeholder: 'https://github.com/yourprofile', icon: '🐙' },
-    { key: 'portfolio', label: 'Portfolio', placeholder: 'https://yourportfolio.com', icon: '🌐' },
+    { key: 'linkedin', label: 'LinkedIn', placeholder: 'https://linkedin.com/in/yourprofile', icon: '/linkedin.png' },
+    { key: 'github', label: 'GitHub', placeholder: 'https://github.com/yourprofile', icon: '/github.png' },
+    { key: 'portfolio', label: 'Portfolio', placeholder: 'https://yourportfolio.com', icon: '/globe.png' },
   ]
 
   return (
@@ -192,8 +193,8 @@ function LinksDrawer({ isOpen, onClose, profile, onSave, token }) {
         )}
 
         {/* Info Message */}
-        <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-700 border border-amber-200">
-          💡 Add your social and portfolio links. Valid URLs required (e.g., https://...)
+        <div className="flex items-center gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-700 border border-amber-200">
+          <Lightbulb size={26} /> Add your social and portfolio links. Valid URLs required (e.g., https://...)
         </div>
 
         {/* Links Form */}
@@ -203,7 +204,7 @@ function LinksDrawer({ isOpen, onClose, profile, onSave, token }) {
           {linkTypes.map(link => (
             <div key={link.key} className="space-y-1">
               <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                <span>{link.icon}</span>
+                <img src={link.icon} alt={`${link.label} icon`} className="h-4 w-4 object-contain" />
                 <span>{link.label}</span>
               </label>
               <input
@@ -227,41 +228,6 @@ function LinksDrawer({ isOpen, onClose, profile, onSave, token }) {
             </div>
           ))}
         </div>
-
-        {/* Current Links Display */}
-        {(links.linkedin || links.github || links.portfolio) && (
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-slate-900">Preview</h4>
-            {linkTypes.map(link => {
-              if (!links[link.key]) return null
-              
-              return (
-                <div key={link.key} className="rounded-lg border border-slate-200 bg-white p-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 space-y-2">
-                      <p className="text-sm font-medium text-slate-900 flex items-center gap-2">
-                        <span>{link.icon}</span>
-                        {link.label}
-                      </p>
-                      {isValidUrl(links[link.key]) ? (
-                        <a
-                          href={links[link.key]}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-cyan-600 hover:text-cyan-700 hover:underline break-all"
-                        >
-                          {links[link.key]}
-                        </a>
-                      ) : (
-                        <p className="text-sm text-slate-600 break-all">{links[link.key]}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
 
         {/* Action Buttons */}
         <div className="flex gap-3 pt-4 sticky bottom-0 bg-white border-t border-slate-200">
