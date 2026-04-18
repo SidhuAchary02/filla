@@ -116,6 +116,7 @@ function Dashboard() {
 
   // Use refreshed profile if available, otherwise use user profile
   const displayProfile = refreshedProfile || profile
+  const displayLocation = displayProfile?.location || {}
 
   const handleDrawerOpen = (drawerName) => {
     setOpenDrawer(drawerName)
@@ -454,11 +455,12 @@ function Dashboard() {
                 <InfoItem label="Email Address" value={user?.email || 'Not provided'} />
                 <InfoItem label="Phone Number" value={displayProfile.phone || '-'} />
                 <InfoItem label="Birthday" value={displayProfile.birthday || '-'} />
-                <InfoItem label="Location" value={[location.city, location.state, location.country].filter(Boolean).join(', ') || '-'} />
+                <InfoItem label="Location" value={[displayLocation.city, displayLocation.state, displayLocation.country].filter(Boolean).join(', ') || '-'} />
                 <InfoItem label="Address" value={displayProfile.address || '-'} />
-                <InfoItem label="Address 2" value={displayProfile.address_2 || '-'} />
-                <InfoItem label="Address 3" value={displayProfile.address_3 || '-'} />
-                <InfoItem label="Postal Code" value={location.pincode || '-'} />
+                <InfoItem label="Nationality" value={displayProfile.nationality || '-'} />
+                <InfoItem label="Preferred Location" value={displayProfile.preferred_location || '-'} />
+                <InfoItem label="Preferred Job Type" value={displayProfile.preferred_job_type || '-'} />
+                <InfoItem label="Postal Code" value={displayLocation.pincode || '-'} />
               </div>
             </SectionCard>
             <SectionCard

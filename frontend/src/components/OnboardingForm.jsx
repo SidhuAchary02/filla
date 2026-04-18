@@ -122,6 +122,9 @@ const ONBOARDING_DRAFT_KEY = 'onboarding_form_draft_v1'
 const getDefaultFormData = () => ({
   job_search_timeline: '',
   location: { country: '', state: '', city: '', pincode: '' },
+  nationality: '',
+  preferred_location: '',
+  preferred_job_type: '',
   resume_url: '',
   resume_file: null,
   experience_level: '',

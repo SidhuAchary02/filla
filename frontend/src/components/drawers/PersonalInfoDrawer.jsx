@@ -12,13 +12,27 @@ function PersonalInfoDrawer({ isOpen, onClose, profile, user, onSave, token }) {
     phone: '',
     birthday: '',
     address: '',
-    address_2: '',
-    address_3: '',
+    nationality: '',
+    preferred_location: '',
+    preferred_job_type: '',
     city: '',
     state: '',
     country: '',
     pincode: '',
   })
+  
+  const [nationalitySearch, setNationalitySearch] = useState('')
+  const [locationSearch, setLocationSearch] = useState('')
+  const [showNationalityDropdown, setShowNationalityDropdown] = useState(false)
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false)
+  
+  // Common nationalities list
+  const nationalities = [
+    'Indian', 'American', 'British', 'Canadian', 'Australian', 'German', 'French', 
+    'Japanese', 'Chinese', 'Spanish', 'Italian', 'Dutch', 'Swedish', 'Norwegian',
+    'Danish', 'Finnish', 'Polish', 'Portuguese', 'Greek', 'Turkish', 'Brazilian',
+    'Mexican', 'Russian', 'Ukrainian', 'Romanian', 'Hungarian', 'Czech', 'Austrian',
+  ].sort()
 
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
@@ -76,16 +90,19 @@ function PersonalInfoDrawer({ isOpen, onClose, profile, user, onSave, token }) {
       phone: profileData?.phone || '',
       birthday: profileData?.birthday || '',
       address: profileData?.address || '',
-      address_2: profileData?.address_2 || '',
-      address_3: profileData?.address_3 || '',
-      city: profileData?.location?.city || '',
-      state: profileData?.location?.state || '',
-      country: profileData?.location?.country || '',
-      pincode: profileData?.location?.pincode || '',
+      nationality: profileData?.nationality || '',
+      preferred_location: profileData?.preferred_location || '',
+      preferred_job_type: profileData?.preferred_job_type || '',
+      city: profileData?.location?.city || profileData?.city || '',
+      state: profileData?.location?.state || profileData?.state || '',
+      country: profileData?.location?.country || profileData?.country || '',
+      pincode: profileData?.location?.pincode || profileData?.pincode || '',
     }
     
     console.log('Populating form with:', formDataToSet)
     setFormData(formDataToSet)
+    setNationalitySearch(formDataToSet.nationality || '')
+    setLocationSearch(formDataToSet.preferred_location || '')
     setError('')
     setSuccess('')
   }
@@ -115,6 +132,23 @@ function PersonalInfoDrawer({ isOpen, onClose, profile, user, onSave, token }) {
     setSuccess('')
 
     try {
+      // Validate required fields
+      if (!formData.nationality?.trim()) {
+        setError('Nationality is required')
+        setIsSaving(false)
+        return
+      }
+      if (!formData.preferred_location?.trim()) {
+        setError('Preferred location is required')
+        setIsSaving(false)
+        return
+      }
+      if (!formData.preferred_job_type?.trim()) {
+        setError('Preferred job type is required')
+        setIsSaving(false)
+        return
+      }
+
       // Structure data to match API schema
       const updateData = {
         first_name: formData.first_name || undefined,
@@ -125,8 +159,9 @@ function PersonalInfoDrawer({ isOpen, onClose, profile, user, onSave, token }) {
         phone: formData.phone || undefined,
         birthday: formData.birthday || undefined,
         address: formData.address || undefined,
-        address_2: formData.address_2 || undefined,
-        address_3: formData.address_3 || undefined,
+        nationality: formData.nationality || undefined,
+        preferred_location: formData.preferred_location || undefined,
+        preferred_job_type: formData.preferred_job_type || undefined,
         location: {
           city: formData.city || undefined,
           state: formData.state || undefined,
@@ -184,7 +219,7 @@ function PersonalInfoDrawer({ isOpen, onClose, profile, user, onSave, token }) {
         {/* Info Message */}
         {!formData.first_name && !formData.phone && !formData.birthday && (
           <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-700 border border-amber-200">
-            💡 You can fill in your personal information here. These fields will be added to your profile.
+            💡 You can fill in your personal information here. Nationality, Preferred Location, and Job Type are required.
           </div>
         )}
         <div className="grid gap-4 sm:grid-cols-3">
@@ -287,30 +322,6 @@ function PersonalInfoDrawer({ isOpen, onClose, profile, user, onSave, token }) {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700">Address 2</label>
-          <input
-            type="text"
-            name="address_2"
-            value={formData.address_2}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm placeholder-slate-400 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-            placeholder="Apt, suite, etc."
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700">Address 3</label>
-          <input
-            type="text"
-            name="address_3"
-            value={formData.address_3}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm placeholder-slate-400 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-            placeholder="Additional info"
-          />
-        </div>
-
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-slate-700">City</label>
@@ -359,6 +370,93 @@ function PersonalInfoDrawer({ isOpen, onClose, profile, user, onSave, token }) {
               placeholder="Postal code"
             />
           </div>
+        </div>
+
+        <div className="relative">
+          <label className="block text-sm font-medium text-slate-700">Nationality <span className="text-red-500">*</span></label>
+          <input
+            type="text"
+            value={nationalitySearch || formData.nationality}
+            onChange={(e) => {
+              setNationalitySearch(e.target.value)
+              setFormData(prev => ({ ...prev, nationality: e.target.value }))
+              setShowNationalityDropdown(true)
+            }}
+            onFocus={() => setShowNationalityDropdown(true)}
+            onBlur={() => setTimeout(() => setShowNationalityDropdown(false), 200)}
+            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm placeholder-slate-400 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+            placeholder="Search and select nationality"
+          />
+          {showNationalityDropdown && (
+            <div className="absolute z-10 mt-1 w-full rounded-lg border border-slate-300 bg-white shadow-lg max-h-48 overflow-y-auto">
+              {nationalities
+                .filter(n => n.toLowerCase().includes(nationalitySearch.toLowerCase()))
+                .map((nation) => (
+                  <div
+                    key={nation}
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, nationality: nation }))
+                      setNationalitySearch(nation)
+                      setShowNationalityDropdown(false)
+                    }}
+                    className="px-3 py-2 hover:bg-cyan-50 cursor-pointer text-sm"
+                  >
+                    {nation}
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+
+        <div className="relative">
+          <label className="block text-sm font-medium text-slate-700">Preferred Location <span className="text-red-500">*</span></label>
+          <input
+            type="text"
+            value={locationSearch || formData.preferred_location}
+            onChange={(e) => {
+              setLocationSearch(e.target.value)
+              setFormData(prev => ({ ...prev, preferred_location: e.target.value }))
+              setShowLocationDropdown(true)
+            }}
+            onFocus={() => setShowLocationDropdown(true)}
+            onBlur={() => setTimeout(() => setShowLocationDropdown(false), 200)}
+            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm placeholder-slate-400 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+            placeholder="Search and select preferred location"
+          />
+          {showLocationDropdown && (
+            <div className="absolute z-10 mt-1 w-full rounded-lg border border-slate-300 bg-white shadow-lg max-h-48 overflow-y-auto">
+              {['Bangalore', 'Mumbai', 'Delhi', 'Hyderabad', 'Chennai', 'Kolkata', 'Pune', 'Ahmedabad', 'Jaipur', 'Lucknow', 'Chandigarh', 'Indore']
+                .filter(l => l.toLowerCase().includes(locationSearch.toLowerCase()))
+                .map((loc) => (
+                  <div
+                    key={loc}
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, preferred_location: loc }))
+                      setLocationSearch(loc)
+                      setShowLocationDropdown(false)
+                    }}
+                    className="px-3 py-2 hover:bg-cyan-50 cursor-pointer text-sm"
+                  >
+                    {loc}
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700">Preferred Job Type <span className="text-red-500">*</span></label>
+          <select
+            name="preferred_job_type"
+            value={formData.preferred_job_type}
+            onChange={handleChange}
+            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+          >
+            <option value="">Select job type</option>
+            <option value="remote">Remote</option>
+            <option value="onsite">On-site</option>
+            <option value="hybrid">Hybrid</option>
+          </select>
         </div>
 
         <div className="flex gap-3 border-t border-slate-200 pt-4">

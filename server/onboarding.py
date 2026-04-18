@@ -59,8 +59,9 @@ def _serialize_profile(profile: dict) -> OnboardingResponse:
         phone=profile.get("phone"),
         birthday=profile.get("birthday"),
         address=profile.get("address"),
-        address_2=profile.get("address_2"),
-        address_3=profile.get("address_3"),
+        nationality=profile.get("nationality"),
+        preferred_location=profile.get("preferred_location"),
+        preferred_job_type=profile.get("preferred_job_type"),
         ethnicity=profile.get("ethnicity"),
         work_authorized_us=profile.get("work_authorized_us"),
         work_authorized_canada=profile.get("work_authorized_canada"),
@@ -90,7 +91,7 @@ def _get_profile_by_user_id(user_id: str):
         "id,user_id,job_search_timeline,location,resume_url,"
         "current_ctc,min_salary,notice_period,"
         "first_name,middle_name,last_name,preferred_name,suffix_name,"
-        "phone,birthday,address,address_2,address_3,"
+        "phone,birthday,address,nationality,preferred_location,preferred_job_type,"
         "experience_level,role,work_experience,education,projects,"
         "links,skills,languages,onboarding_completed,"
         "ethnicity,work_authorized_us,work_authorized_canada,work_authorized_uk,"
@@ -303,10 +304,12 @@ async def update_personal_info(
             payload["birthday"] = request.birthday
         if request.address is not None:
             payload["address"] = request.address
-        if request.address_2 is not None:
-            payload["address_2"] = request.address_2
-        if request.address_3 is not None:
-            payload["address_3"] = request.address_3
+        if request.nationality is not None:
+            payload["nationality"] = request.nationality
+        if request.preferred_location is not None:
+            payload["preferred_location"] = request.preferred_location
+        if request.preferred_job_type is not None:
+            payload["preferred_job_type"] = request.preferred_job_type
         if request.job_search_timeline is not None:
             payload["job_search_timeline"] = request.job_search_timeline
         if request.location is not None:

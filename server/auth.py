@@ -14,7 +14,7 @@ def ensure_profile_exists(user_id: str):
         "id,user_id,job_search_timeline,location,resume_url,"
         "current_ctc,min_salary,notice_period,"
         "first_name,middle_name,last_name,preferred_name,suffix_name,"
-        "phone,birthday,address,address_2,address_3,"
+        "phone,birthday,address,nationality,preferred_location,preferred_job_type,"
         "experience_level,role,work_experience,education,projects,"
         "links,skills,languages,onboarding_completed,"
         "ethnicity,work_authorized_us,work_authorized_canada,work_authorized_uk,"
@@ -50,7 +50,7 @@ def ensure_profile_exists(user_id: str):
         "id,user_id,job_search_timeline,location,resume_url,"
         "current_ctc,min_salary,notice_period,"
         "first_name,middle_name,last_name,preferred_name,suffix_name,"
-        "phone,birthday,address,address_2,address_3,"
+        "phone,birthday,address,nationality,preferred_location,preferred_job_type,"
         "experience_level,role,work_experience,education,projects,"
         "links,skills,languages,onboarding_completed,"
         "ethnicity,work_authorized_us,work_authorized_canada,work_authorized_uk,"
@@ -159,14 +159,11 @@ async def login(request: LoginRequest):
 
         profile = profile_res.data if profile_res.data else {}
 
-        return {
-            "token": response.session.access_token,
-            "user": {
-                "id": response.user.id,
-                "email": response.user.email,
-                "profile": profile
-            }
-        }
+        return AuthResponse(
+            access_token=response.session.access_token,
+            token_type="bearer",
+            user_id=response.user.id
+        )
 
     except Exception as e:
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -219,8 +216,9 @@ async def get_current_user(authorization: str = Header(None)):
             phone=profile_data.get("phone"),
             birthday=profile_data.get("birthday"),
             address=profile_data.get("address"),
-            address_2=profile_data.get("address_2"),
-            address_3=profile_data.get("address_3"),
+            nationality=profile_data.get("nationality"),
+            preferred_location=profile_data.get("preferred_location"),
+            preferred_job_type=profile_data.get("preferred_job_type"),
             ethnicity=profile_data.get("ethnicity"),
             work_authorized_us=profile_data.get("work_authorized_us"),
             work_authorized_canada=profile_data.get("work_authorized_canada"),

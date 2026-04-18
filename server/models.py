@@ -86,8 +86,9 @@ class PersonalInfoRequest(BaseModel):
     phone: Optional[str] = None
     birthday: Optional[str] = None  # ISO format: YYYY-MM-DD
     address: Optional[str] = None
-    address_2: Optional[str] = None
-    address_3: Optional[str] = None
+    nationality: Optional[str] = None
+    preferred_location: Optional[str] = None
+    preferred_job_type: Optional[str] = None  # "remote", "onsite", "hybrid"
     job_search_timeline: Optional[str] = None
     location: Optional[LocationModel] = None
     resume_url: Optional[str] = None
@@ -128,8 +129,9 @@ class OnboardingResponse(BaseModel):
     phone: Optional[str] = None
     birthday: Optional[str] = None
     address: Optional[str] = None
-    address_2: Optional[str] = None
-    address_3: Optional[str] = None
+    nationality: Optional[str] = None
+    preferred_location: Optional[str] = None
+    preferred_job_type: Optional[str] = None
     # Employment Information
     ethnicity: Optional[str] = None
     work_authorized_us: Optional[str] = None
@@ -175,8 +177,9 @@ class UserProfileResponse(BaseModel):
     phone: Optional[str] = None
     birthday: Optional[str] = None
     address: Optional[str] = None
-    address_2: Optional[str] = None
-    address_3: Optional[str] = None
+    nationality: Optional[str] = None
+    preferred_location: Optional[str] = None
+    preferred_job_type: Optional[str] = None
     # Employment Information
     ethnicity: Optional[str] = None
     work_authorized_us: Optional[str] = None
