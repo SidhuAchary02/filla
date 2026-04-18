@@ -4,12 +4,14 @@ import LoginForm from './components/LoginForm'
 import OnboardingForm from './components/OnboardingForm'
 import Dashboard from './components/Dashboard'
 import ProtectedRoute from './components/ProtectedRoute'
+import LandingPage from './components/LandingPage'
 
 function App() {
   return (
     <Router>
       <Routes>
         {/* Public Routes */}
+        <Route path="/" element={<LandingPage />} />
         <Route path="/signup" element={<SignupForm />} />
         <Route path="/login" element={<LoginForm />} />
 
@@ -40,8 +42,7 @@ function App() {
         />
 
         {/* Redirects */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   )
