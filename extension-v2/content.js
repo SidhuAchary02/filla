@@ -22,9 +22,7 @@
   "use strict";
 
   if (window.__fillaV4Loaded) {
-    // Script already initialized in this page context.
-    // Do not register a new handler from this invocation, because
-    // early return would skip local let initializations in this scope.
+    chrome.runtime.onMessage.addListener(handleMessage);
     return;
   }
   window.__fillaV4Loaded = true;
@@ -32,19 +30,71 @@
   const FM = window.FillaFieldMapper;
 
   /* ═══════════════════════════════════════════════════════════════
-     UI STATUS (NO IN-PAGE WIDGET)
+     FLOATING UI
   ═══════════════════════════════════════════════════════════════ */
+  (function injectStyles() {
+    const s = document.createElement("style");
+    s.textContent = `
+      #filla-ui{position:fixed;top:20px;right:20px;width:252px;background:#111118;
+        border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:14px;
+        z-index:2147483647;font-family:'DM Sans',system-ui,sans-serif;color:#f1f1f6;
+        box-shadow:0 12px 36px rgba(0,0,0,0.6);transition:all .3s ease;font-size:13px}
+      #filla-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+      #filla-logo{width:28px;height:28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);
+        border-radius:8px;display:flex;align-items:center;justify-content:center;
+        font-weight:800;font-size:13px;color:#fff;flex-shrink:0}
+      #filla-title{font-size:13px;font-weight:600}
+      #filla-status{font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px}
+      #filla-progress{font-size:11px;color:#6366f1;min-height:14px;margin-top:4px}
+      #filla-log{margin-top:8px;max-height:90px;overflow-y:auto;font-size:10px;
+        color:rgba(255,255,255,0.38);line-height:1.7;
+        border-top:1px solid rgba(255,255,255,0.06);padding-top:6px}
+      #filla-mini-logo{width:36px;height:36px;background:linear-gradient(135deg,#6366f1,#8b5cf6);
+        border-radius:10px;display:flex;align-items:center;justify-content:center;
+        font-weight:800;font-size:14px;color:#fff;cursor:pointer;
+        box-shadow:0 6px 20px rgba(99,102,241,0.4);transition:transform .2s}
+      #filla-mini-logo:hover{transform:scale(1.08)}
+      .filla-resume-hint{margin-top:8px;padding:9px 11px;
+        background:rgba(99,102,241,0.1);border:1px dashed #6366f1;
+        border-radius:8px;font-size:12px;color:#a5b4fc;line-height:1.5}
+      .filla-resume-hint a{color:#818cf8;text-decoration:underline}
+    `;
+    document.head.appendChild(s);
+  })();
+
   let _logLines = [];
+  function getBox() {
+    let b = document.getElementById("filla-ui");
+    if (!b) { b = document.createElement("div"); b.id = "filla-ui"; document.body.appendChild(b); }
+    return b;
+  }
   function uiLog(line) {
     _logLines.push(line);
     if (_logLines.length > 14) _logLines.shift();
-    console.log(`[Filla] ${line}`);
+    const el = document.getElementById("filla-log");
+    if (el) el.innerHTML = _logLines.join("<br>");
   }
-  function showUI(_status, _progress = "") {
-    // Intentionally no-op: keep loading feedback only in popup UI.
+  function showUI(status, progress = "") {
+    const box = getBox();
+    box.style.cssText = "";
+    box.innerHTML = `
+      <div id="filla-header">
+        <div id="filla-logo">F</div>
+        <div><div id="filla-title">Filla Autofill</div>
+             <div id="filla-status">${status}</div></div>
+      </div>
+      <div id="filla-progress">${progress}</div>
+      <div id="filla-log"></div>`;
+    if (_logLines.length) document.getElementById("filla-log").innerHTML = _logLines.join("<br>");
   }
   function showMini() {
-    // Intentionally no-op: remove floating icon on web pages.
+    const box = getBox();
+    Object.assign(box.style, {
+      width:"auto", padding:"8px", borderRadius:"12px 0 0 12px",
+      right:"0px", top:"100px", cursor:"pointer"
+    });
+    box.innerHTML = `<div id="filla-mini-logo">F</div>`;
+    box.onclick = () => showUI("Ready ✨");
   }
 
   /* ═══════════════════════════════════════════════════════════════
@@ -52,6 +102,57 @@
   ═══════════════════════════════════════════════════════════════ */
   const delay  = ms => new Promise(r => setTimeout(r, ms));
   const scroll = el => el.scrollIntoView({ behavior: "smooth", block: "center" });
+
+  function sendMessageAsync(message) {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage(message, (resp) => {
+          if (chrome.runtime.lastError) {
+            resolve({ success: false, error: chrome.runtime.lastError.message });
+            return;
+          }
+          resolve(resp || { success: false, error: "No response from background" });
+        });
+      } catch (err) {
+        resolve({ success: false, error: err?.message || "Message send failed" });
+      }
+    });
+  }
+
+  function parseFilename(contentDisposition, fallbackUrl, contentType) {
+    const cd = String(contentDisposition || "");
+    const m = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i);
+    let name = decodeURIComponent((m?.[1] || m?.[2] || "").trim());
+
+    if (!name) {
+      try {
+        const u = new URL(String(fallbackUrl || ""));
+        name = (u.pathname.split("/").pop() || "").trim();
+      } catch (_) {
+        name = "";
+      }
+    }
+
+    if (!name || !name.includes(".")) {
+      const t = String(contentType || "").toLowerCase();
+      const ext = t.includes("pdf") ? "pdf"
+        : t.includes("msword") ? "doc"
+        : t.includes("wordprocessingml") ? "docx"
+        : t.includes("rtf") ? "rtf"
+        : t.includes("opendocument") ? "odt"
+        : "pdf";
+      name = `resume.${ext}`;
+    }
+    return name;
+  }
+
+  function base64ToFile(base64, contentType, fileName) {
+    const binary = atob(base64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+    return new File([bytes], fileName, { type: contentType || "application/octet-stream" });
+  }
 
   function highlight(el) {
     const was = el.style.outline;
@@ -535,17 +636,86 @@
   /* ═══════════════════════════════════════════════════════════════
      RESUME NOTICE
   ═══════════════════════════════════════════════════════════════ */
-  function handleResumeFields(userData) {
+  async function handleResumeFields(userData) {
     const resumeUrl = userData.profile?.resume_url;
+    const fileInputs = Array.from(document.querySelectorAll('input[type="file"]'));
 
-    document.querySelectorAll('input[type="file"]').forEach(f => {
-      highlight(f);
-      // Do not inject any hint UI into the page.
-    });
+    if (!fileInputs.length) return;
+
+    let fetchResult = null;
+    let resumeFile = null;
+
     if (resumeUrl) {
-      uiLog("📎 Resume detected; file upload requires manual action")
-    } else {
-      uiLog("📎 Resume not found; file upload requires manual action")
+      uiLog("📎 Resume: fetching file…");
+      fetchResult = await sendMessageAsync({
+        type: "FILLA_FETCH_RESUME",
+        resumeUrl,
+      });
+
+      if (fetchResult?.success && fetchResult?.base64) {
+        const fileName = parseFilename(fetchResult.contentDisposition, resumeUrl, fetchResult.contentType);
+        resumeFile = base64ToFile(fetchResult.base64, fetchResult.contentType, fileName);
+      }
+    }
+
+    // Keka asks a native confirm dialog after resume upload.
+    // Auto-accept only that specific prompt during attach, then restore.
+    const originalConfirm = window.confirm;
+    const autoAcceptPatterns = [
+      "overwrite the existing data",
+      "data extracted from the uploaded resume",
+    ];
+
+    window.confirm = function patchedConfirm(message) {
+      const text = String(message || "").toLowerCase();
+      if (autoAcceptPatterns.some(p => text.includes(p))) {
+        uiLog("✅ Auto-confirmed resume overwrite prompt");
+        return true;
+      }
+      return originalConfirm.call(window, message);
+    };
+
+    fileInputs.forEach(f => {
+      highlight(f);
+
+      if (resumeFile) {
+        try {
+          const dt = new DataTransfer();
+          dt.items.add(resumeFile);
+          f.files = dt.files;
+          fire(f);
+          uiLog(`✅ Resume attached: ${resumeFile.name}`);
+        } catch (err) {
+          uiLog(`⚠️ Resume attach failed: ${err?.message || "unknown error"}`);
+        }
+      }
+
+      const zone = f.closest("div") || f.parentElement;
+      if (zone) {
+        let hint = zone.querySelector(".filla-resume-hint");
+        if (!hint) {
+          hint = document.createElement("div");
+          hint.className = "filla-resume-hint";
+          zone.appendChild(hint);
+        }
+
+        if (resumeFile) {
+          hint.innerHTML = `✅ <strong>Filla:</strong> Resume attached automatically (${resumeFile.name}).`;
+        } else {
+          const reason = fetchResult?.error ? `<br><small>${fetchResult.error}</small>` : "";
+          hint.innerHTML = `📎 <strong>Filla:</strong> Upload resume manually.${
+            resumeUrl
+              ? `<br><a href="${resumeUrl}" target="_blank">Open your saved resume ↗</a>${reason}`
+              : ""
+          }`;
+        }
+      }
+    });
+
+    window.confirm = originalConfirm;
+
+    if (!resumeFile) {
+      uiLog("📎 Resume: auto-attach unavailable, manual upload needed");
     }
   }
 
@@ -589,7 +759,7 @@
     await fillWebsiteAddSection(userData);
 
     // 7. Resume
-    handleResumeFields(userData);
+    await handleResumeFields(userData);
 
     showUI("✅ Done!", `${fields.length} fields processed`);
     uiLog("Pipeline complete");

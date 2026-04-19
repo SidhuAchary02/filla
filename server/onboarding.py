@@ -1,9 +1,11 @@
-from fastapi import APIRouter, HTTPException, status, Header
+from fastapi import APIRouter, HTTPException, status, Header, Query, Response
 from models import OnboardingRequest, OnboardingResponse, PersonalInfoRequest
 from database import supabase_client
 from datetime import datetime
 from normalizer import normalize_profile
 import json
+import mimetypes
+import httpx
 
 router = APIRouter(prefix="/api", tags=["onboarding"])
 
@@ -157,6 +159,11 @@ def _compute_normalized_profile(profile: dict) -> dict:
     normalized = normalize_profile(skills, work_experience)
     normalized["notice_period"] = notice_period
     return normalized
+
+
+def _infer_media_type_from_name(file_name: str) -> str:
+    guessed, _ = mimetypes.guess_type(file_name or "")
+    return guessed or "application/octet-stream"
 
 
 # ============ SUBMIT ONBOARDING ============
@@ -558,4 +565,72 @@ async def get_autofill_data(authorization: str = Header(None)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch autofill data: {str(e)}"
+        )
+
+
+@router.get("/extension/resume-file")
+async def get_extension_resume_file(
+    resume_ref: str = Query(..., min_length=1),
+    authorization: str = Header(None),
+):
+    """Return raw resume bytes for extension uploads (auth required)."""
+    user_id = verify_token(authorization)
+
+    profile = _ensure_profile_exists(user_id)
+    stored_ref = str(profile.get("resume_url") or "").strip()
+    incoming_ref = str(resume_ref or "").strip()
+
+    # Prevent downloading arbitrary URLs/paths through this endpoint.
+    if not stored_ref or incoming_ref != stored_ref:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Resume reference does not match the user profile",
+        )
+
+    try:
+        lower = incoming_ref.lower()
+
+        if lower.startswith("http://") or lower.startswith("https://"):
+            async with httpx.AsyncClient(follow_redirects=True, timeout=25.0) as client:
+                resp = await client.get(incoming_ref)
+
+            if resp.status_code >= 400:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Resume URL fetch failed: HTTP {resp.status_code}",
+                )
+
+            file_name = incoming_ref.split("?")[0].rstrip("/").split("/")[-1] or "resume.pdf"
+            content_type = resp.headers.get("content-type") or _infer_media_type_from_name(file_name)
+            content_disposition = resp.headers.get("content-disposition") or f'attachment; filename="{file_name}"'
+
+            return Response(
+                content=resp.content,
+                media_type=content_type,
+                headers={"Content-Disposition": content_disposition},
+            )
+
+        storage_path = incoming_ref.lstrip("/")
+        if not storage_path.startswith(f"{user_id}/"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Resume storage path does not belong to the authenticated user",
+            )
+
+        file_name = storage_path.split("/")[-1] or "resume.pdf"
+        content_type = _infer_media_type_from_name(file_name)
+        file_bytes = supabase_client.storage.from_("resumes").download(storage_path)
+
+        return Response(
+            content=file_bytes,
+            media_type=content_type,
+            headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load resume file: {str(e)}",
         )

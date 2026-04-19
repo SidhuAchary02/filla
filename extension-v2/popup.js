@@ -60,6 +60,8 @@ const userEmailDisplay = document.getElementById("user-email-display");
 const userAvatar = document.getElementById("user-avatar");
 const manageProfileBtn = document.getElementById("manage-profile-btn");
 
+const API_BASE = "http://localhost:8000";
+
 // ─── View Switching ────────────────────────────────────────────────────────
 function showView(name) {
     viewLogin.classList.add("hidden");
@@ -100,6 +102,24 @@ function setAutofillLoading(loading) {
     autofillBtn.disabled = loading;
 }
 
+async function fetchAutofillData(accessToken) {
+    if (!accessToken) throw new Error("Missing access token");
+
+    const res = await fetch(`${API_BASE}/api/extension/autofill-data`, {
+        method: "GET",
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+        },
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+        throw new Error(data?.detail || data?.message || "Failed to fetch autofill data");
+    }
+
+    return data;
+}
+
 // ─── Sign In Handler ──────────────────────────────────────────────────────
 signinBtn.addEventListener("click", async () => {
     clearLoginError();
@@ -133,18 +153,19 @@ signinBtn.addEventListener("click", async () => {
             throw new Error(data.message || "Login failed");
         }
 
-        // ✅ EXPECTED RESPONSE FORMAT
-        // {
-        //   token: "...",
-        //   user: { ...your full userData object... }
-        // }
+        const accessToken = data.access_token || data.token;
+        if (!accessToken) {
+            throw new Error("Login succeeded but no access token was returned");
+        }
+
+        const userData = data.user || await fetchAutofillData(accessToken);
 
         await chrome.storage.local.set({
-            fillaToken: data.token,
-            fillaUserData: data.user,
+            fillaToken: accessToken,
+            fillaUserData: userData,
         });
 
-        populateDashboard(data.user);
+        populateDashboard(userData);
         showView("dashboard");
 
     } catch (err) {
@@ -209,10 +230,22 @@ manageProfileBtn.addEventListener("click", () => {
         "fillaUserData",
     ]);
 
-    if (fillaToken && fillaUserData) {
-        populateDashboard(fillaUserData);
+    if (!fillaToken) {
+        showView("login");
+        return;
+    }
+
+    try {
+        const freshData = await fetchAutofillData(fillaToken);
+        await chrome.storage.local.set({ fillaUserData: freshData });
+        populateDashboard(freshData);
         showView("dashboard");
-    } else {
+    } catch (_err) {
+        if (fillaUserData) {
+            populateDashboard(fillaUserData);
+            showView("dashboard");
+            return;
+        }
         showView("login");
     }
 })();
