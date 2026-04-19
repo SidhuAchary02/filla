@@ -534,6 +534,20 @@ async def get_autofill_data(authorization: str = Header(None)):
         if work_exp:
             total_experience_years = len(work_exp)  # Simple count, or sum duration if available
 
+        raw_phone = str(profile.get("phone") or "").strip()
+        phone_country_code = str(profile.get("phone_country_code") or "").strip()
+        phone_number = str(profile.get("phone_number") or "").strip()
+
+        # Fallback parsing when split columns are null but combined phone exists.
+        if raw_phone and (not phone_country_code or not phone_number):
+            import re
+            m = re.match(r"^\s*(\+\d{1,4})[\s\-]*(\d{6,15})\s*$", raw_phone)
+            if m:
+                if not phone_country_code:
+                    phone_country_code = m.group(1)
+                if not phone_number:
+                    phone_number = m.group(2)
+
         autofill_data = {
             "role": profile.get("role"),
             "job_search_timeline": profile.get("job_search_timeline"),
@@ -551,6 +565,9 @@ async def get_autofill_data(authorization: str = Header(None)):
             "full_name": profile.get("full_name"),
             "email": user_email,  # Use retrieved auth email
             "phone": profile.get("phone"),
+            "phone_country_iso": profile.get("phone_country_iso"),
+            "phone_country_code": phone_country_code,
+            "phone_number": phone_number,
             "first_name": profile.get("first_name"),
             "last_name": profile.get("last_name"),
             "notice_period": normalized.get("notice_period") or profile.get("notice_period"),

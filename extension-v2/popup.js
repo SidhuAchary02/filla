@@ -64,6 +64,7 @@ const API_BASE = "http://localhost:8000";
 
 // ─── View Switching ────────────────────────────────────────────────────────
 function showView(name) {
+    if (!viewLogin || !viewDashboard) return;
     viewLogin.classList.add("hidden");
     viewLogin.classList.remove("visible");
     viewDashboard.classList.add("hidden");
@@ -79,27 +80,27 @@ function showView(name) {
 
 // ─── Auth Helpers ──────────────────────────────────────────────────────────
 function showLoginError(msg) {
-    loginErrorText.textContent = msg;
-    loginError.classList.remove("hidden");
+    if (loginErrorText) loginErrorText.textContent = msg;
+    if (loginError) loginError.classList.remove("hidden");
 }
 function clearLoginError() {
-    loginError.classList.add("hidden");
+    if (loginError) loginError.classList.add("hidden");
 }
 
 function setSigninLoading(loading) {
     // No visual loading indicator by request; only prevent double submit.
-    signinBtn.disabled = loading;
+    if (signinBtn) signinBtn.disabled = loading;
 }
 
 // ─── Dashboard Helpers ────────────────────────────────────────────────────
 function populateDashboard(userData) {
-    userEmailDisplay.textContent = userData.email;
-    userAvatar.textContent = (userData.profile?.first_name?.[0] || userData.email[0]).toUpperCase();
+    if (userEmailDisplay) userEmailDisplay.textContent = userData.email || "";
+    if (userAvatar) userAvatar.textContent = (userData.profile?.first_name?.[0] || userData.email?.[0] || "U").toUpperCase();
 }
 
 function setAutofillLoading(loading) {
     // No visual loading indicator by request; only prevent double clicks.
-    autofillBtn.disabled = loading;
+    if (autofillBtn) autofillBtn.disabled = loading;
 }
 
 async function fetchAutofillData(accessToken) {
@@ -125,7 +126,7 @@ async function fetchAutofillData(accessToken) {
 }
 
 // ─── Sign In Handler ──────────────────────────────────────────────────────
-signinBtn.addEventListener("click", async () => {
+signinBtn?.addEventListener("click", async () => {
     clearLoginError();
 
     const email = inputEmail.value.trim();
@@ -181,24 +182,24 @@ signinBtn.addEventListener("click", async () => {
 });
 
 // Allow Enter key in password field
-inputPassword.addEventListener("keydown", (e) => {
+inputPassword?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") signinBtn.click();
 });
-inputEmail.addEventListener("keydown", (e) => {
+inputEmail?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") inputPassword.focus();
 });
 
 // ─── Logout Handler ────────────────────────────────────────────────────────
-logoutBtn.addEventListener("click", async () => {
+logoutBtn?.addEventListener("click", async () => {
     await chrome.storage.local.remove(["fillaToken", "fillaUserData"]);
-    inputEmail.value = "";
-    inputPassword.value = "";
+    if (inputEmail) inputEmail.value = "";
+    if (inputPassword) inputPassword.value = "";
     clearLoginError();
     showView("login");
 });
 
 // ─── Autofill Handler ─────────────────────────────────────────────────────
-autofillBtn.addEventListener("click", async () => {
+autofillBtn?.addEventListener("click", async () => {
     setAutofillLoading(true);
 
     const { fillaUserData } = await chrome.storage.local.get("fillaUserData");
@@ -221,7 +222,7 @@ autofillBtn.addEventListener("click", async () => {
 });
 
 // ─── Manage Profile Handler ───────────────────────────────────────────────
-manageProfileBtn.addEventListener("click", () => {
+manageProfileBtn?.addEventListener("click", () => {
     // Opens LinkedIn profile as a stand-in for profile management
     // Replace with your actual profile management URL
     chrome.tabs.create({ url: "https://www.linkedin.com/in/sidhu2" });

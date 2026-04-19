@@ -307,6 +307,11 @@
       formatted = FM.toYYYY(isoDateStr);
     } else if (forceFormat === "DD/MM/YYYY" || ph.includes("dd/mm/yyyy")) {
       formatted = FM.toDDMMYYYY(isoDateStr);
+    } else if (forceFormat === "MM/DD/YYYY" || ph.includes("mm/dd/yyyy")) {
+      const d = new Date(isoDateStr);
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      formatted = `${mm}/${dd}/${d.getFullYear()}`;
     } else if (forceFormat === "MM/YYYY" || ph.includes("mm/yyyy") || ph.includes("mm yyyy")) {
       formatted = FM.toMMYYYY(isoDateStr);
     } else if (ph.includes("yyyy")) {
@@ -316,6 +321,30 @@
     }
 
     fillText(el, formatted);
+  }
+
+  function detectDateFormatFromField(el, key, fingerprint = "") {
+    const parts = [
+      el?.placeholder || "",
+      el?.getAttribute?.("aria-label") || "",
+      el?.getAttribute?.("name") || "",
+      el?.getAttribute?.("id") || "",
+      fingerprint || "",
+      el?.closest?.("label,div,section,fieldset")?.innerText || "",
+    ];
+    const meta = FM.normalize(parts.join(" "));
+
+    if (meta.includes("mm/dd/yyyy") || meta.includes("mm-dd-yyyy") || meta.includes("mm dd yyyy")) {
+      return "MM/DD/YYYY";
+    }
+    if (meta.includes("dd/mm/yyyy") || meta.includes("dd-mm-yyyy") || meta.includes("dd mm yyyy")) {
+      return "DD/MM/YYYY";
+    }
+    if (meta.includes("mm/yyyy") || meta.includes("mm yyyy")) return "MM/YYYY";
+    if (meta.includes("yyyy") && !meta.includes("mm")) return "YYYY";
+
+    if (key === "birthday") return "DD/MM/YYYY";
+    return null;
   }
 
   /* ═══════════════════════════════════════════════════════════════
@@ -638,7 +667,7 @@
   function dateFormat(key) {
     if (key === "edu_start" || key === "edu_end") return "YYYY";
     if (key === "work_start" || key === "work_end") return "MM/YYYY";
-    if (key === "birthday") return "DD/MM/YYYY";
+    if (key === "birthday") return null;
     if (key === "lwd") return "DD/MM/YYYY";
     return null;
   }
@@ -710,11 +739,15 @@
     if (type === "date" || type === "month") return fillDate(el, String(rawVal));
 
     // Date text inputs: check by key or placeholder
-    if (DATE_KEYS.has(resolvedKey)) return fillDate(el, String(rawVal), dateFormat(resolvedKey));
+    if (DATE_KEYS.has(resolvedKey)) {
+      const adaptive = detectDateFormatFromField(el, resolvedKey, fp);
+      return fillDate(el, String(rawVal), adaptive || dateFormat(resolvedKey));
+    }
 
     const ph = FM.normalize(el.placeholder || "");
-    if (ph.includes("mm/yyyy") || ph.includes("dd/mm/yyyy") || ph.includes("yyyy")) {
-      return fillDate(el, String(rawVal), dateFormat(resolvedKey) || null);
+    if (ph.includes("mm/yyyy") || ph.includes("dd/mm/yyyy") || ph.includes("mm/dd/yyyy") || ph.includes("yyyy")) {
+      const adaptive = detectDateFormatFromField(el, resolvedKey, fp);
+      return fillDate(el, String(rawVal), adaptive || dateFormat(resolvedKey) || null);
     }
 
     fillText(el, value);
@@ -848,9 +881,15 @@
   ═══════════════════════════════════════════════════════════════ */
   function fillCriticalDirectInputs(userData) {
     const p = userData.profile || {};
-    const phoneValue = [p.phone, [p.phone_country_code, p.phone_number].filter(Boolean).join(" ")]
-      .map(v => String(v || "").trim())
-      .find(Boolean) || "";
+    function localPhoneNumber() {
+      const split = String(p.phone_number || "").trim();
+      if (split) return split;
+      const combined = String(p.phone || "").trim();
+      const m = combined.match(/^\s*\+\d{1,4}[\s\-]*(\d{6,15})\s*$/);
+      if (m?.[1]) return m[1];
+      return combined.replace(/[^0-9]/g, "");
+    }
+    const phoneValue = localPhoneNumber();
     const portfolioValue =
       p.links?.portfolio || p.links?.github || p.links?.linkedin || "";
 

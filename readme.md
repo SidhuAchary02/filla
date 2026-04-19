@@ -1,4 +1,4 @@
-![filla logo](imgs/logo-2.png)
+<img src="imgs/logo-2.png" alt="filla logo" width="120"/>
 
 # filla - simply automating jobs form filling
 
