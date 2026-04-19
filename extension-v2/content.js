@@ -53,9 +53,34 @@
       .filla-resume-hint strong{color:#9e2f09}
       .filla-resume-hint a{color:#9e2f09;text-decoration:underline}
       .filla-resume-hint small{color:#9e2f09}
+      .filla-ai-btn-wrap{position:relative;display:block}
+      .filla-ai-btn{position:absolute;top:6px;right:6px;z-index:2;
+        border:1px solid #da5a2a;background:#fff7f3;color:#9e2f09;
+        border-radius:999px;padding:2px 8px;font-size:10px;line-height:1.3;
+        font-family:'DM Sans',system-ui,sans-serif;cursor:pointer}
+      .filla-ai-btn:hover{background:#ffe9de}
+      .filla-ai-inline{margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+      .filla-ai-inline-main{border:none;background:#1da7c7;color:#fff;
+        border-radius:10px;padding:9px 14px;font-size:14px;font-weight:700;
+        font-family:'DM Sans',system-ui,sans-serif;cursor:pointer;line-height:1.2}
+      .filla-ai-inline-main:hover{background:#1591ad}
+      .filla-ai-inline-cancel{background:transparent;border:none;color:#d33a36;
+        font-size:14px;font-weight:600;font-family:'DM Sans',system-ui,sans-serif;cursor:pointer}
+      .filla-ai-inline-tokens{margin-left:auto;border:1px solid #d9d9df;background:#f8fafc;color:#1f2937;
+        border-radius:10px;padding:8px 12px;font-size:11px;display:flex;align-items:center;gap:6px;
+        font-family:'DM Sans',system-ui,sans-serif}
+      .filla-ai-inline-dot{width:16px;height:16px;border-radius:50%;border:2px solid #1da7c7;display:inline-block}
     `;
     document.head.appendChild(s);
   })();
+
+  function ensureUnknownFieldAIBtn(el, fingerprint = "") {
+    return;
+  }
+
+  function injectUnknownAIButtons(userData) {
+    return;
+  }
 
   function getBox() {
     let b = document.getElementById("filla-ui");
@@ -391,6 +416,7 @@
     const hasDialOptions = Array.from(el.options).some(opt => /\+\d{1,4}/.test(opt.text || ""));
 
     if (isCountryLike && preferredDial && hasDialOptions) {
+      let firstDialMatch = null;
       for (const opt of el.options) {
         const txt = FM.normalize(opt.text || "");
         const hasIndiaToken = txt.includes("india") || txt.includes("indian");
@@ -400,6 +426,15 @@
           uiLog(`✅ select "${el.name || el.id}" = "${opt.text}"`);
           return true;
         }
+        if (!firstDialMatch && (txt.includes(preferredDial) || txt.includes(preferredDial.replace("+", "")))) {
+          firstDialMatch = opt;
+        }
+      }
+      if (firstDialMatch) {
+        el.selectedIndex = firstDialMatch.index;
+        fire(el);
+        uiLog(`✅ select "${el.name || el.id}" = "${firstDialMatch.text}"`);
+        return true;
       }
     }
 
@@ -491,6 +526,7 @@
       const hasDialOptions = Array.from(options).some(opt => /\+\d{1,4}/.test(opt.innerText || opt.textContent || ""));
 
       if (isCountryLike && preferredDial && hasDialOptions) {
+        let firstDialMatch = null;
         for (const opt of options) {
           const t = FM.normalize(opt.innerText || opt.textContent || "");
           const hasIndiaToken = t.includes("india") || t.includes("indian");
@@ -499,6 +535,14 @@
             uiLog(`✅ aria-select "${key}" = "${opt.innerText.trim()}"`);
             return true;
           }
+          if (!firstDialMatch && (t.includes(preferredDial) || t.includes(preferredDial.replace("+", "")))) {
+            firstDialMatch = opt;
+          }
+        }
+        if (firstDialMatch) {
+          firstDialMatch.click();
+          uiLog(`✅ aria-select "${key}" = "${firstDialMatch.innerText.trim()}"`);
+          return true;
         }
       }
 
@@ -685,9 +729,33 @@
     if (tag !== "select" && el.value && el.value.trim() !== "") return;
 
     const fp  = FM.extractFingerprint(el);
+    const links = userData.profile?.links || {};
+
+    // Hard-priority URL fields to avoid accidental mismatch from nearby labels.
+    if (fp.includes("linkedin") && links.linkedin) {
+      fillText(el, links.linkedin);
+      return;
+    }
+    if (fp.includes("google scholar") && links.google_scholar) {
+      fillText(el, links.google_scholar);
+      return;
+    }
+    if (fp.includes("github") && links.github) {
+      fillText(el, links.github);
+      return;
+    }
+
     const key = FM.matchKey(fp);
 
+    const looksEssayPrompt = tag === "textarea" &&
+      /(why|hardest problem|be specific|motivation|what'?s|what is|excites you)/.test(fp);
+    if (looksEssayPrompt) {
+      ensureUnknownFieldAIBtn(el, fp);
+      return;
+    }
+
     if (!key) {
+      ensureUnknownFieldAIBtn(el, fp);
       console.log(`[Filla] ❓ "${fp.slice(0, 60)}"`);
       return;
     }
@@ -724,6 +792,7 @@
     let value  = normalizeValue(resolvedKey, rawVal, el);
 
     if (value === null || value === undefined || value === "") {
+      ensureUnknownFieldAIBtn(el, fp);
       console.log(`[Filla] ⚠️ no value key="${resolvedKey}" ctx=`, ctx);
       return;
     }
@@ -815,7 +884,10 @@
     for (const dd of combos) {
       const fp  = FM.extractFingerprint(dd);
       const key = FM.matchKey(fp);
-      if (!key) continue;
+      if (!key) {
+        ensureUnknownFieldAIBtn(dd, fp);
+        continue;
+      }
 
       const ctx = detectSection(dd);
       let resolvedKey = key;
@@ -860,13 +932,27 @@
     );
 
     for (const inp of allInputs) {
-      if (inp.value) continue;
       const fp = FM.extractFingerprint(inp);
+      const current = String(inp.value || "").trim().toLowerCase();
+
+      const isKnownLinkField =
+        fp.includes("linkedin") ||
+        fp.includes("google scholar") ||
+        fp.includes("github") ||
+        fp.includes("portfolio") ||
+        fp.includes("personal website") ||
+        fp.includes("github/portfolio") ||
+        fp.includes("github portfolio");
+
+      if (current && !isKnownLinkField) continue;
 
       if (fp.includes("github/portfolio") || fp.includes("github portfolio")) {
         fillText(inp, p.links?.github || p.links?.portfolio || "");
+      } else if (fp.includes("google scholar")) {
+        if (p.links?.google_scholar) fillText(inp, p.links.google_scholar);
       } else if (fp.includes("linkedin")) {
-        fillText(inp, p.links?.linkedin || "");
+        const target = String(p.links?.linkedin || "").trim();
+        if (target && !current.includes("linkedin.com")) fillText(inp, target);
       } else if (fp.includes("github")) {
         fillText(inp, p.links?.github || "");
       } else if (fp.includes("portfolio") || fp.includes("personal website")) {
@@ -1074,6 +1160,9 @@
 
     // 7. Resume
     await handleResumeFields(userData);
+
+    // 8. Unknown/unmapped fields AI stubs
+    injectUnknownAIButtons(userData);
 
     showUI("✅ Done!", `${fields.length} fields processed`);
     uiLog("Pipeline complete");

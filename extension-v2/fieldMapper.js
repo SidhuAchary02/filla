@@ -40,6 +40,7 @@
     email:          ["email address", "email", "e-mail"],
     phone_country_code: [
       "phone country code",
+      "phone country",
       "country code",
       "dial code",
       "isd code",
@@ -93,6 +94,8 @@
                       "minimum salary",
                       "target salary",
                       "min salary",
+                      "minimum required base salary",
+                      "minimum base salary",
                     ],
     notice_period:  [
                       "official notice period",  // ← exact label on this form ("official notice period (in days)")
@@ -160,9 +163,10 @@
     /* ── Links ─────────────────────────────────────────────────── */
     // "Github/Portfolio Link" is ONE field on this form → resolve as portfolio (primary)
     github_portfolio: ["github/portfolio link", "github/portfolio"],
-    linkedin:         ["linkedin url", "linkedin profile", "linkedin"],
+      google_scholar:   ["google scholar"],
+    linkedin:         ["your LinkedIn profile","linkedin url", "linkedin profile", "linkedin", "LinkedIn"],
     github:           ["github url", "github profile", "github link", "github"],
-    portfolio:        ["portfolio url", "portfolio link", "personal website", "personal site", "personal portfolio" ,"website url", "portfolio"],
+    portfolio:        ["website","portfolio url", "portfolio link", "personal website", "personal site", "personal portfolio" ,"website url", "portfolio"],
 
     /* ── Fallback — keep SHORT keywords LAST and at LOWEST priority ─ */
     current_company: ["current company", "present company"],
@@ -265,9 +269,19 @@
       return "";
     }
 
+    function phoneLocalNumber() {
+      const split = String(p.phone_number || "").trim();
+      if (split) return split;
+      const combined = String(p.phone || "").trim();
+      const m = combined.match(/^\s*\+\d{1,4}[\s\-]*(\d{6,15})\s*$/);
+      if (m?.[1]) return m[1];
+      return combined.replace(/[^0-9]/g, "");
+    }
+
     function hasTechnicalDegree() {
       return eduList.length > 0 ? "Yes" : "No";
     }
+
 
     // Notice period: convert "immediate" → 0 days for number fields
     function noticeDays() {
@@ -285,9 +299,9 @@
       preferred_name:   p.preferred_name,
       middle_name:      p.middle_name,
       suffix:           p.suffix_name,
-      email:            userData.email,
+      email:            userData.email || p.email || "",
       phone_country_code: phoneCountryCode(),
-      phone_number_only:  p.phone_number || "",
+      phone_number_only:  phoneLocalNumber(),
       phone:            buildPhoneNumber(),
       birthday:         p.birthday,
       gender:           p.gender,
@@ -357,9 +371,10 @@
       /* Links */
       // "Github/Portfolio Link" expects one valid URL, not a combined string.
       github_portfolio: p.links?.portfolio || p.links?.github || p.links?.linkedin || "",
+        google_scholar:   p.links?.google_scholar || "",
       linkedin:         p.links?.linkedin,
       github:           p.links?.github,
-      portfolio:        p.links?.portfolio || p.links?.github || p.links?.linkedin || "",
+        portfolio:        p.links?.portfolio || "",
 
       /* Fallbacks */
       name_fallback:    `${p.first_name || ""} ${p.last_name || ""}`.trim(),
