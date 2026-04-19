@@ -38,6 +38,18 @@
     middle_name:    ["middle name"],
     suffix:         ["suffix", "salutation"],
     email:          ["email address", "email", "e-mail"],
+    phone_country_code: [
+      "phone country code",
+      "country code",
+      "dial code",
+      "isd code",
+      "calling code",
+    ],
+    phone_number_only: [
+      "phone number",
+      "mobile number",
+      "contact number",
+    ],
     phone:          ["mobile phone", "phone number", "contact number", "telephone", "mobile", "phone", "whatsapp"],
     birthday:       ["date of birth", "birthday", "birth date", "dob"],
     gender:         ["gender", "sex"],
@@ -48,6 +60,12 @@
     work_auth_us:   ["authorized to work in the us", "us work authorization"],
     work_auth_uk:   ["authorized to work in the uk", "uk work authorization"],
     work_auth_ca:   ["authorized to work in canada", "canada work authorization"],
+    work_auth_general: [
+      "legally authorized to work in the country where you are applying",
+      "authorized to work in the country where you are applying",
+      "legally authorized to work",
+      "work authorization",
+    ],
 
     /* ── Nationality (its own key — MUST NOT fall to location) ── */
     nationality:    ["nationality"],
@@ -55,6 +73,7 @@
     /* ── Job / Career ──────────────────────────────────────────── */
     role:           ["job title", "position applied", "designation", "applying for", "current role"],
     experience:     [
+                      "how many years of it professional experience do you have",
                       "experience (in years)",   // ← exact label on this form
                       "years of experience",
                       "total experience",
@@ -88,6 +107,19 @@
     job_platform:   ["platform did you learn", "how did you hear", "source", "referral"],
     job_search:     ["job search timeline", "actively looking"],
     preferred_loc:  ["preferred location"],
+    english_proficiency: [
+      "what is your english proficiency level",
+      "english proficiency level",
+      "english proficiency",
+      "proficiency level",
+    ],
+    technical_degree: [
+      "do you have a technical degree or a 4 year college degree",
+      "do you have a technical degree or a 4-year college degree",
+      "technical degree or a 4 year college degree",
+      "technical degree",
+      "college degree",
+    ],
 
     /* ── Work Experience section ───────────────────────────────── */
     // Exact labels used on this form:
@@ -117,7 +149,7 @@
     /* ── Location ──────────────────────────────────────────────── */
     city:    ["current location", "current city", "city"],
     state:   ["state", "province", "region"],
-    country: ["country"],
+    country: ["what country are you located in", "country"],
     pincode: ["pincode", "postal code", "zip code", "zip"],
     address: ["address", "street", "residence"],
 
@@ -130,9 +162,10 @@
     github_portfolio: ["github/portfolio link", "github/portfolio"],
     linkedin:         ["linkedin url", "linkedin profile", "linkedin"],
     github:           ["github url", "github profile", "github link", "github"],
-    portfolio:        ["portfolio url", "portfolio link", "personal website", "website url", "portfolio"],
+    portfolio:        ["portfolio url", "portfolio link", "personal website", "personal site", "personal portfolio" ,"website url", "portfolio"],
 
     /* ── Fallback — keep SHORT keywords LAST and at LOWEST priority ─ */
+    current_company: ["current company", "present company"],
     name_fallback: ["name"],
     // NOTE: "location" deliberately removed from any key to avoid false matches.
     //       Work/edu location is handled by section-specific logic in content.js.
@@ -199,6 +232,43 @@
       return total;
     }
 
+    function isoToDial(iso) {
+      const map = {
+        IN: "+91",
+        US: "+1",
+        GB: "+44",
+        CA: "+1",
+        AU: "+61",
+        SG: "+65",
+        AE: "+971",
+      };
+      const k = String(iso || "").trim().toUpperCase();
+      return map[k] || "";
+    }
+
+    function buildPhoneNumber() {
+      const cc = String(p.phone_country_code || "").trim();
+      const num = String(p.phone_number || "").trim();
+      const whole = String(p.phone || "").trim();
+      if (whole) return whole;
+      if (cc && num) return `${cc} ${num}`;
+      return num || cc || "";
+    }
+
+    function phoneCountryCode() {
+      const cc = String(p.phone_country_code || "").trim();
+      if (cc) return cc;
+      const byIso = isoToDial(p.phone_country_iso);
+      if (byIso) return byIso;
+      const fromPhone = String(p.phone || "").trim().match(/^\s*(\+\d{1,4})\b/);
+      if (fromPhone?.[1]) return fromPhone[1];
+      return "";
+    }
+
+    function hasTechnicalDegree() {
+      return eduList.length > 0 ? "Yes" : "No";
+    }
+
     // Notice period: convert "immediate" → 0 days for number fields
     function noticeDays() {
       const np = String(p.notice_period || "").toLowerCase();
@@ -216,7 +286,9 @@
       middle_name:      p.middle_name,
       suffix:           p.suffix_name,
       email:            userData.email,
-      phone:            p.phone,
+      phone_country_code: phoneCountryCode(),
+      phone_number_only:  p.phone_number || "",
+      phone:            buildPhoneNumber(),
       birthday:         p.birthday,
       gender:           p.gender,
       ethnicity:        p.ethnicity,
@@ -226,6 +298,7 @@
       work_auth_us:     p.work_authorized_us,
       work_auth_uk:     p.work_authorized_uk,
       work_auth_ca:     p.work_authorized_canada,
+      work_auth_general: p.work_authorized || p.work_authorized_in_country || "Yes",
 
       /* FIX #1: Nationality → country ("India"), NOT city */
       nationality:      normalizeCountryName(p.nationality || loc.country),
@@ -243,9 +316,12 @@
       job_platform:     "",
       job_search:       p.job_search_timeline,
       preferred_loc:    `${loc.city}, ${loc.country}`,
+      english_proficiency: p.english_proficiency || p.english_level || "Professional",
+      technical_degree: hasTechnicalDegree(),
 
       /* FIX #2: Work section — resolved per ctx.index */
       work_company:     job.company     || "",
+      current_company:  job.company     || "",
       work_title:       job.title       || p.role || "",
       work_currently:   job.is_current  ? "yes" : "no",
       work_start:       toMMYYYY(job.start_date),
@@ -279,11 +355,11 @@
                    : (p.languages || ""),
 
       /* Links */
-      // "Github/Portfolio Link" → show both
-      github_portfolio: `${p.links?.github || ""} | ${p.links?.portfolio || ""}`.replace(/^ \| | \| $/, ""),
+      // "Github/Portfolio Link" expects one valid URL, not a combined string.
+      github_portfolio: p.links?.portfolio || p.links?.github || p.links?.linkedin || "",
       linkedin:         p.links?.linkedin,
       github:           p.links?.github,
-      portfolio:        p.links?.portfolio,
+      portfolio:        p.links?.portfolio || p.links?.github || p.links?.linkedin || "",
 
       /* Fallbacks */
       name_fallback:    `${p.first_name || ""} ${p.last_name || ""}`.trim(),

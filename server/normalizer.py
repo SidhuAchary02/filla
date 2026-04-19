@@ -234,6 +234,15 @@ def normalize_profile(
     if not work_experience:
         work_experience = []
 
+    normalized_skills = []
+    for s in skills:
+        if isinstance(s, dict):
+            val = s.get("name") or s.get("normalized") or ""
+            if val:
+                normalized_skills.append(str(val))
+        elif s is not None:
+            normalized_skills.append(str(s))
+
     # Initialize all categories to 0
     experience_years = {
         category: 0.0
@@ -249,10 +258,8 @@ def normalize_profile(
         # 2. Work experience descriptions
 
         # Match in skills list
-        skill_matched = any(
-            keyword in _normalize_text(" ".join(skills))
-            for keyword in keywords
-        )
+        skills_blob = _normalize_text(" ".join(normalized_skills))
+        skill_matched = any(keyword in skills_blob for keyword in keywords)
 
         # If skill is in list, also check work history to calculate duration
         if skill_matched and work_experience:

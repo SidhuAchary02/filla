@@ -21,10 +21,9 @@
 (function () {
   "use strict";
 
-  if (window.__fillaV4Loaded) {
-    chrome.runtime.onMessage.addListener(handleMessage);
-    return;
-  }
+  let _logLines = [];
+
+  if (window.__fillaV4Loaded) return;
   window.__fillaV4Loaded = true;
 
   const FM = window.FillaFieldMapper;
@@ -58,7 +57,6 @@
     document.head.appendChild(s);
   })();
 
-  let _logLines = [];
   function getBox() {
     let b = document.getElementById("filla-ui");
     if (!b) { b = document.createElement("div"); b.id = "filla-ui"; document.body.appendChild(b); }
@@ -75,6 +73,7 @@
     box.style.cssText = "";
     box.innerHTML = `
       <div id="filla-header">
+        <img src="${chrome.runtime.getURL("logo-2.png")}" alt="Filla Logo" id="filla-logo">
         <div><div id="filla-title">Filla Autofill</div>
              <div id="filla-status">${status}</div></div>
       </div>
@@ -131,17 +130,49 @@
     return name;
   }
 
+  function inferResumeMimeType(fileName, contentType) {
+    const ct = String(contentType || "").toLowerCase().trim();
+    if (ct && ct !== "application/octet-stream") return ct;
+
+    const name = String(fileName || "").toLowerCase();
+    if (name.endsWith(".pdf")) return "application/pdf";
+    if (name.endsWith(".doc")) return "application/msword";
+    if (name.endsWith(".docx")) {
+      return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    }
+    return "application/pdf";
+  }
+
   function base64ToFile(base64, contentType, fileName) {
     const binary = atob(base64);
     const len = binary.length;
     const bytes = new Uint8Array(len);
     for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
-    return new File([bytes], fileName, { type: contentType || "application/octet-stream" });
+    const mime = inferResumeMimeType(fileName, contentType);
+    return new File([bytes], fileName, { type: mime });
+  }
+
+  function hideUI(afterMs = 2200) {
+    setTimeout(() => {
+      const box = document.getElementById("filla-ui");
+      if (box) box.remove();
+    }, afterMs);
+  }
+
+  function clearResumeErrorText(root) {
+    if (!root) return;
+    const nodes = root.querySelectorAll("div,span,p,small,li");
+    nodes.forEach((n) => {
+      const txt = String(n.textContent || "").toLowerCase().trim();
+      if (txt.startsWith("file format not supported")) {
+        n.style.display = "none";
+      }
+    });
   }
 
   function highlight(el) {
     const was = el.style.outline;
-    el.style.outline = "2.5px solid #6366f1";
+    el.style.outline = "2.5px solid #da5a2a";
     el.style.borderRadius = "3px";
     setTimeout(() => { el.style.outline = was; }, 700);
   }
@@ -238,13 +269,21 @@
   ═══════════════════════════════════════════════════════════════ */
   function fillText(el, value) {
     const type = (el.getAttribute("type") || "text").toLowerCase();
+    let nextValue = value;
+
+    if (type === "url") {
+      const raw = String(value || "").trim();
+      const firstUrl = raw.match(/https?:\/\/[^\s|,]+/i)?.[0] || "";
+      nextValue = firstUrl || raw;
+    }
+
     el.focus();
     if (type === "number") {
-      const num = Number(String(value).replace(/[^0-9.]/g, ""));
+      const num = Number(String(nextValue).replace(/[^0-9.]/g, ""));
       if (isNaN(num)) return;
       el.value = num;
     } else {
-      el.value = String(value);
+      el.value = String(nextValue);
     }
     fire(el);
     uiLog(`✅ "${el.name || el.id || el.placeholder || "??"}" = "${el.value}"`);
@@ -303,6 +342,37 @@
     const synonyms = key === "degree" ? degreeSynonyms(value) : [target];
 
     const isCountryLike = key === "nationality" || key === "country";
+    const isPhoneCodeLike = key === "phone_country_code";
+
+    function hasWholeWord(text, word) {
+      const t = String(text || "");
+      const w = String(word || "").trim();
+      if (!t || !w) return false;
+      const esc = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(`(^|\\b)${esc}(\\b|$)`).test(t);
+    }
+
+    function preferredDialForCountry(t) {
+      const n = FM.normalize(t);
+      if (n === "india" || n === "indian") return "+91";
+      return "";
+    }
+
+    const preferredDial = preferredDialForCountry(rawValue);
+    const hasDialOptions = Array.from(el.options).some(opt => /\+\d{1,4}/.test(opt.text || ""));
+
+    if (isCountryLike && preferredDial && hasDialOptions) {
+      for (const opt of el.options) {
+        const txt = FM.normalize(opt.text || "");
+        const hasIndiaToken = txt.includes("india") || txt.includes("indian");
+        if (hasIndiaToken && txt.includes(preferredDial.replace("+", ""))) {
+          el.selectedIndex = opt.index;
+          fire(el);
+          uiLog(`✅ select "${el.name || el.id}" = "${opt.text}"`);
+          return true;
+        }
+      }
+    }
 
     // Country / nationality must prefer exact match to avoid false positive like:
     // "British Indian Ocean Territory" for value "Indian".
@@ -319,12 +389,28 @@
       }
     }
 
+    if (isPhoneCodeLike) {
+      for (const opt of el.options) {
+        const t = FM.normalize(opt.text);
+        const v = FM.normalize(opt.value);
+        if (t.includes(target) || v.includes(target)) {
+          el.selectedIndex = opt.index;
+          fire(el);
+          uiLog(`✅ select "${el.name || el.id}" = "${opt.text}"`);
+          return true;
+        }
+      }
+    }
+
     for (const opt of el.options) {
       const t = FM.normalize(opt.text);
       const v = FM.normalize(opt.value);
 
-      const direct = t === target || v === target ||
-                     (target.length > 2 && (t.includes(target) || target.includes(t)));
+      const countryDirect = isCountryLike
+        ? (t === target || v === target || hasWholeWord(t, target) || hasWholeWord(v, target))
+        : false;
+      const direct = countryDirect || t === target || v === target ||
+                     (!isCountryLike && target.length > 2 && (t.includes(target) || target.includes(t)));
       const syn    = synonyms.some(s => s.length > 1 && (t.includes(s) || v.includes(s)));
 
       if (direct || syn) {
@@ -350,33 +436,115 @@
 
     const target   = FM.normalize(rawValue);
     const synonyms = key === "degree" ? degreeSynonyms(value) : [target];
-    const isCountryLike = key === "nationality" || key === "country";
+    const isCountryLike = key === "nationality" || key === "country" || key === "work_auth_general";
+    const isPhoneCodeLike = key === "phone_country_code";
+
+    function hasWholeWord(text, word) {
+      const t = String(text || "");
+      const w = String(word || "").trim();
+      if (!t || !w) return false;
+      const esc = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(`(^|\\b)${esc}(\\b|$)`).test(t);
+    }
+
+    function findOptions() {
+      return document.querySelectorAll('[role="option"],[role="menuitem"],[role="listitem"]');
+    }
+
+    function preferredDialForCountry(t) {
+      const n = FM.normalize(t);
+      if (n === "india" || n === "indian") return "+91";
+      return "";
+    }
+
+    function pickFromOptions(options) {
+      const preferredDial = preferredDialForCountry(rawValue);
+      const hasDialOptions = Array.from(options).some(opt => /\+\d{1,4}/.test(opt.innerText || opt.textContent || ""));
+
+      if (isCountryLike && preferredDial && hasDialOptions) {
+        for (const opt of options) {
+          const t = FM.normalize(opt.innerText || opt.textContent || "");
+          const hasIndiaToken = t.includes("india") || t.includes("indian");
+          if (hasIndiaToken && t.includes(preferredDial.replace("+", ""))) {
+            opt.click();
+            uiLog(`✅ aria-select "${key}" = "${opt.innerText.trim()}"`);
+            return true;
+          }
+        }
+      }
+
+      if (isCountryLike) {
+        for (const opt of options) {
+          const t = FM.normalize(opt.innerText || opt.textContent || "");
+          if (t === target) {
+            opt.click();
+            uiLog(`✅ aria-select "${key}" = "${opt.innerText.trim()}"`);
+            return true;
+          }
+        }
+      }
+
+      if (isPhoneCodeLike) {
+        for (const opt of options) {
+          const t = FM.normalize(opt.innerText || opt.textContent || "");
+          if (t.includes(target)) {
+            opt.click();
+            uiLog(`✅ aria-select "${key}" = "${opt.innerText.trim()}"`);
+            return true;
+          }
+        }
+      }
+
+      for (const opt of options) {
+        const t = FM.normalize(opt.innerText || opt.textContent || "");
+        const countryDirect = isCountryLike ? (t === target || hasWholeWord(t, target)) : false;
+        const looseDirect = !isCountryLike && t.includes(target);
+        if (countryDirect || looseDirect || synonyms.some(s => s.length > 1 && t.includes(s))) {
+          opt.click();
+          uiLog(`✅ aria-select "${key}" = "${opt.innerText.trim()}"`);
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function typeIntoSearchInput() {
+      const active = document.activeElement;
+      const candidates = [
+        active,
+        ...Array.from(document.querySelectorAll('input[role="combobox"], input[aria-autocomplete="list"], input[type="search"], [role="combobox"] input')),
+      ].filter(Boolean);
+
+      for (const node of candidates) {
+        if (!(node instanceof HTMLInputElement)) continue;
+        const rect = node.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) continue;
+        node.focus();
+        node.value = String(rawValue);
+        fire(node);
+        return true;
+      }
+      return false;
+    }
 
     trigger.click();
     await delay(400);
 
-    const options = document.querySelectorAll('[role="option"],[role="menuitem"],[role="listitem"]');
-
-    if (isCountryLike) {
-      for (const opt of options) {
-        const t = FM.normalize(opt.innerText || opt.textContent || "");
-        if (t === target) {
-          opt.click();
-          uiLog(`✅ aria-select "${key}" = "${opt.innerText.trim()}"`);
-          await delay(200);
-          return true;
-        }
-      }
+    let options = findOptions();
+    if (pickFromOptions(options)) {
+      await delay(200);
+      return true;
     }
-    for (const opt of options) {
-      const t = FM.normalize(opt.innerText || opt.textContent || "");
-      if (t.includes(target) || synonyms.some(s => s.length > 1 && t.includes(s))) {
-        opt.click();
-        uiLog(`✅ aria-select "${key}" = "${opt.innerText.trim()}"`);
+
+    if (typeIntoSearchInput()) {
+      await delay(350);
+      options = findOptions();
+      if (pickFromOptions(options)) {
         await delay(200);
         return true;
       }
     }
+
     document.body.click(); // close
     uiLog(`⚠️ aria-select no match "${key}" for "${value}"`);
     await delay(200);
@@ -498,8 +666,28 @@
     // Detect section (work / education) and index
     const ctx = detectSection(el);
 
+    function looksLikePhoneCountryControl(fingerprint, node) {
+      const fpText = String(fingerprint || "");
+      const direct = (fpText.includes("phone") || fpText.includes("mobile") || fpText.includes("telephone")) &&
+        (fpText.includes("country code") || fpText.includes("dial code") || fpText.includes("isd") || fpText.includes("calling code") || fpText.includes("country"));
+      if (direct) return true;
+
+      const container = node?.closest?.("label,div,section,fieldset");
+      const text = FM.normalize((container?.innerText || "").slice(0, 240));
+      return (text.includes("phone") || text.includes("mobile") || text.includes("telephone")) &&
+        (text.includes("country code") || text.includes("dial code") || text.includes("isd") || text.includes("calling code") || text.includes("country"));
+    }
+
     // Special case: "Location" INSIDE a work/edu section → use section-specific value
     let resolvedKey = key;
+    if ((key === "country" || key === "phone" || key === "phone_number_only") && looksLikePhoneCountryControl(fp, el)) {
+      resolvedKey = "phone_country_code";
+    }
+    if ((key === "phone" || key === "name_fallback") &&
+        (fp.includes("phone") || fp.includes("mobile") || fp.includes("telephone")) &&
+        !(fp.includes("country code") || fp.includes("dial code") || fp.includes("isd") || fp.includes("calling code"))) {
+      resolvedKey = "phone_number_only";
+    }
     if (key === "name_fallback" && ctx.section === "work"  && fp.includes("location")) resolvedKey = "work_location_val";
     if (key === "name_fallback" && ctx.section === "education" && fp.includes("location")) resolvedKey = "edu_location";
 
@@ -597,10 +785,34 @@
       if (!key) continue;
 
       const ctx = detectSection(dd);
-      const raw = FM.resolveValue(key, userData, ctx);
-      if (!raw) continue;
+      let resolvedKey = key;
 
-      await fillAriaDropdown(dd, raw, key);
+      const container = dd.closest("label,div,section,fieldset");
+      const nearbyText = FM.normalize((container?.innerText || "").slice(0, 320));
+      const hasNearbyPhoneInput = !!container?.querySelector?.('input[type="tel"], input[name*="phone" i], input[id*="phone" i]');
+      const phoneCountryByContext =
+        (hasNearbyPhoneInput ||
+         fp.includes("phone") || fp.includes("mobile") || fp.includes("telephone") || fp.includes("contact") ||
+         nearbyText.includes("phone") || nearbyText.includes("mobile") || nearbyText.includes("telephone")) &&
+        (fp.includes("country") || fp.includes("code") || fp.includes("dial") || fp.includes("isd") ||
+         nearbyText.includes("country") || nearbyText.includes("code") || nearbyText.includes("dial") || nearbyText.includes("isd"));
+
+      if (phoneCountryByContext) {
+        resolvedKey = "phone_country_code";
+      }
+
+      if (key === "country") {
+        const fpLower = fp;
+        if ((fpLower.includes("phone") || fpLower.includes("mobile") || fpLower.includes("telephone")) &&
+            (fpLower.includes("country code") || fpLower.includes("dial code") || fpLower.includes("isd") || fpLower.includes("calling code"))) {
+          resolvedKey = "phone_country_code";
+        }
+      }
+
+      const raw = FM.resolveValue(resolvedKey, userData, ctx);
+      if (raw === null || raw === undefined || raw === "") continue;
+
+      await fillAriaDropdown(dd, raw, resolvedKey);
     }
   }
 
@@ -626,6 +838,37 @@
         fillText(inp, p.links?.github || "");
       } else if (fp.includes("portfolio") || fp.includes("personal website")) {
         fillText(inp, p.links?.portfolio || "");
+      }
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     DIRECT FALLBACKS: PHONE + PORTFOLIO
+     Some forms render labels in wrappers that confuse generic key matching.
+  ═══════════════════════════════════════════════════════════════ */
+  function fillCriticalDirectInputs(userData) {
+    const p = userData.profile || {};
+    const phoneValue = [p.phone, [p.phone_country_code, p.phone_number].filter(Boolean).join(" ")]
+      .map(v => String(v || "").trim())
+      .find(Boolean) || "";
+    const portfolioValue =
+      p.links?.portfolio || p.links?.github || p.links?.linkedin || "";
+
+    const inputs = Array.from(document.querySelectorAll(
+      'input[type="text"],input[type="url"],input[type="search"],input[type="tel"]'
+    ));
+
+    for (const inp of inputs) {
+      if (inp.value && inp.value.trim() !== "") continue;
+      const fp = FM.extractFingerprint(inp);
+
+      if (phoneValue && /(^|\b)(phone|mobile|telephone|whatsapp)(\b|$)/.test(fp)) {
+        fillText(inp, phoneValue);
+        continue;
+      }
+
+      if (portfolioValue && /(portfolio url|portfolio link|personal website|personal site|personal portfolio|portfolio)/.test(fp)) {
+        fillText(inp, portfolioValue);
       }
     }
   }
@@ -711,6 +954,8 @@
           dt.items.add(resumeFile);
           f.files = dt.files;
           fire(f);
+          const zone = f.closest("div") || f.parentElement;
+          clearResumeErrorText(zone);
           uiLog(`✅ Resume attached: ${resumeFile.name}`);
         } catch (err) {
           uiLog(`⚠️ Resume attach failed: ${err?.message || "unknown error"}`);
@@ -782,6 +1027,9 @@
     // 5. Social / website links (direct inputs)
     await fillSocialAndWebsiteLinks(userData);
 
+    // 5b. Critical direct fallback for stubborn forms
+    fillCriticalDirectInputs(userData);
+
     // 6. Websites "Add" section
     await fillWebsiteAddSection(userData);
 
@@ -790,6 +1038,7 @@
 
     showUI("✅ Done!", `${fields.length} fields processed`);
     uiLog("Pipeline complete");
+    hideUI();
 
     console.log("[Filla v4] ✅ Pipeline complete");
   }

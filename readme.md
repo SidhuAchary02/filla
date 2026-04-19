@@ -1,3 +1,5 @@
+![filla logo](imgs/logo-2.png)
+
 # filla - simply automating jobs form filling
 
 ### reason to build:

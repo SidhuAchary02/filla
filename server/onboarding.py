@@ -152,7 +152,16 @@ def _compute_normalized_profile(profile: dict) -> dict:
       }
     }
     """
-    skills = profile.get("skills") or []
+    raw_skills = profile.get("skills") or []
+    skills = []
+    for s in raw_skills:
+        if isinstance(s, dict):
+            name = s.get("name") or s.get("normalized") or ""
+            if name:
+                skills.append(str(name))
+        elif s is not None:
+            skills.append(str(s))
+
     work_experience = profile.get("work_experience") or []
     notice_period = profile.get("notice_period") or "immediate"
 

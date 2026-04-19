@@ -114,6 +114,10 @@ async function fetchAutofillData(accessToken) {
 
     const data = await res.json();
     if (!res.ok) {
+        if (res.status === 401) {
+            await chrome.storage.local.remove(["fillaToken", "fillaUserData"]);
+            throw new Error("Session expired. Please sign in again.");
+        }
         throw new Error(data?.detail || data?.message || "Failed to fetch autofill data");
     }
 
@@ -241,7 +245,7 @@ manageProfileBtn.addEventListener("click", () => {
         populateDashboard(freshData);
         showView("dashboard");
     } catch (_err) {
-        if (fillaUserData) {
+        if (fillaUserData && _err?.message !== "Session expired. Please sign in again.") {
             populateDashboard(fillaUserData);
             showView("dashboard");
             return;
