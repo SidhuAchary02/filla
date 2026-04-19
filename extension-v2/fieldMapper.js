@@ -178,6 +178,13 @@
     const job = workList[ctx.index] ?? workList[0] ?? {};
     const edu = eduList[ctx.index]  ?? eduList[0]  ?? {};
 
+    function normalizeCountryName(raw) {
+      const v = String(raw || "").trim().toLowerCase();
+      if (!v) return "";
+      if (v === "indian") return "India";
+      return String(raw || "").trim();
+    }
+
     function getInternshipMonths() {
       let total = 0;
       workList.forEach(e => {
@@ -221,7 +228,7 @@
       work_auth_ca:     p.work_authorized_canada,
 
       /* FIX #1: Nationality → country ("India"), NOT city */
-      nationality:      loc.country,                         // ← "India"
+      nationality:      normalizeCountryName(p.nationality || loc.country),
 
       /* Career */
       role:             p.role,

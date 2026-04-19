@@ -35,29 +35,25 @@
   (function injectStyles() {
     const s = document.createElement("style");
     s.textContent = `
-      #filla-ui{position:fixed;top:20px;right:20px;width:252px;background:#111118;
-        border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:14px;
-        z-index:2147483647;font-family:'DM Sans',system-ui,sans-serif;color:#f1f1f6;
-        box-shadow:0 12px 36px rgba(0,0,0,0.6);transition:all .3s ease;font-size:13px}
+      #filla-ui{position:fixed;top:20px;right:20px;width:280px;background:#fff7f3;
+        border:1px solid #da5a2a;border-radius:16px;padding:14px;
+        z-index:2147483647;font-family:'DM Sans',system-ui,sans-serif;color:#1f1c17;
+        box-shadow:0 10px 28px rgba(158,47,9,0.16);transition:all .2s ease;font-size:13px}
       #filla-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-      #filla-logo{width:28px;height:28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);
-        border-radius:8px;display:flex;align-items:center;justify-content:center;
-        font-weight:800;font-size:13px;color:#fff;flex-shrink:0}
+      #filla-logo{width:28px;height:28px;object-fit:contain;display:block;flex-shrink:0}
       #filla-title{font-size:13px;font-weight:600}
-      #filla-status{font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px}
-      #filla-progress{font-size:11px;color:#6366f1;min-height:14px;margin-top:4px}
+      #filla-status{font-size:11px;color:#9e2f09;margin-top:2px}
+      #filla-progress{font-size:11px;color:#9e2f09;min-height:14px;margin-top:4px;font-weight:700}
       #filla-log{margin-top:8px;max-height:90px;overflow-y:auto;font-size:10px;
-        color:rgba(255,255,255,0.38);line-height:1.7;
-        border-top:1px solid rgba(255,255,255,0.06);padding-top:6px}
-      #filla-mini-logo{width:36px;height:36px;background:linear-gradient(135deg,#6366f1,#8b5cf6);
-        border-radius:10px;display:flex;align-items:center;justify-content:center;
-        font-weight:800;font-size:14px;color:#fff;cursor:pointer;
-        box-shadow:0 6px 20px rgba(99,102,241,0.4);transition:transform .2s}
-      #filla-mini-logo:hover{transform:scale(1.08)}
+        color:#9e2f09;line-height:1.7;
+        border-top:1px solid #f0cdbf;padding-top:6px}
       .filla-resume-hint{margin-top:8px;padding:9px 11px;
-        background:rgba(99,102,241,0.1);border:1px dashed #6366f1;
-        border-radius:8px;font-size:12px;color:#a5b4fc;line-height:1.5}
-      .filla-resume-hint a{color:#818cf8;text-decoration:underline}
+        background:#fff7f3;border:1px solid #da5a2a;
+        border-radius:10px;font-size:12px;color:#9e2f09;line-height:1.5;
+        font-family:'DM Sans',system-ui,sans-serif}
+      .filla-resume-hint strong{color:#9e2f09}
+      .filla-resume-hint a{color:#9e2f09;text-decoration:underline}
+      .filla-resume-hint small{color:#9e2f09}
     `;
     document.head.appendChild(s);
   })();
@@ -79,7 +75,6 @@
     box.style.cssText = "";
     box.innerHTML = `
       <div id="filla-header">
-        <div id="filla-logo">F</div>
         <div><div id="filla-title">Filla Autofill</div>
              <div id="filla-status">${status}</div></div>
       </div>
@@ -87,16 +82,6 @@
       <div id="filla-log"></div>`;
     if (_logLines.length) document.getElementById("filla-log").innerHTML = _logLines.join("<br>");
   }
-  function showMini() {
-    const box = getBox();
-    Object.assign(box.style, {
-      width:"auto", padding:"8px", borderRadius:"12px 0 0 12px",
-      right:"0px", top:"100px", cursor:"pointer"
-    });
-    box.innerHTML = `<div id="filla-mini-logo">F</div>`;
-    box.onclick = () => showUI("Ready ✨");
-  }
-
   /* ═══════════════════════════════════════════════════════════════
      UTILITIES
   ═══════════════════════════════════════════════════════════════ */
@@ -308,8 +293,31 @@
      FILL: NATIVE <select>
   ═══════════════════════════════════════════════════════════════ */
   function fillSelect(el, value, key) {
-    const target   = FM.normalize(String(value));
+    let rawValue = String(value);
+    if (key === "nationality" || key === "country") {
+      const n = FM.normalize(rawValue);
+      if (n === "indian") rawValue = "India";
+    }
+
+    const target   = FM.normalize(rawValue);
     const synonyms = key === "degree" ? degreeSynonyms(value) : [target];
+
+    const isCountryLike = key === "nationality" || key === "country";
+
+    // Country / nationality must prefer exact match to avoid false positive like:
+    // "British Indian Ocean Territory" for value "Indian".
+    if (isCountryLike) {
+      for (const opt of el.options) {
+        const t = FM.normalize(opt.text);
+        const v = FM.normalize(opt.value);
+        if (t === target || v === target) {
+          el.selectedIndex = opt.index;
+          fire(el);
+          uiLog(`✅ select "${el.name || el.id}" = "${opt.text}"`);
+          return true;
+        }
+      }
+    }
 
     for (const opt of el.options) {
       const t = FM.normalize(opt.text);
@@ -334,13 +342,32 @@
      FILL: CUSTOM ARIA DROPDOWN
   ═══════════════════════════════════════════════════════════════ */
   async function fillAriaDropdown(trigger, value, key) {
-    const target   = FM.normalize(String(value));
+    let rawValue = String(value);
+    if (key === "nationality" || key === "country") {
+      const n = FM.normalize(rawValue);
+      if (n === "indian") rawValue = "India";
+    }
+
+    const target   = FM.normalize(rawValue);
     const synonyms = key === "degree" ? degreeSynonyms(value) : [target];
+    const isCountryLike = key === "nationality" || key === "country";
 
     trigger.click();
     await delay(400);
 
     const options = document.querySelectorAll('[role="option"],[role="menuitem"],[role="listitem"]');
+
+    if (isCountryLike) {
+      for (const opt of options) {
+        const t = FM.normalize(opt.innerText || opt.textContent || "");
+        if (t === target) {
+          opt.click();
+          uiLog(`✅ aria-select "${key}" = "${opt.innerText.trim()}"`);
+          await delay(200);
+          return true;
+        }
+      }
+    }
     for (const opt of options) {
       const t = FM.normalize(opt.innerText || opt.textContent || "");
       if (t.includes(target) || synonyms.some(s => s.length > 1 && t.includes(s))) {
@@ -763,8 +790,6 @@
 
     showUI("✅ Done!", `${fields.length} fields processed`);
     uiLog("Pipeline complete");
-    await delay(2000);
-    showMini();
 
     console.log("[Filla v4] ✅ Pipeline complete");
   }
