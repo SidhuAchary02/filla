@@ -178,6 +178,48 @@ async function handleFetchResume(resumeUrl) {
 ═══════════════════════════════════════════════════════════════ */
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
+  if (message.type === "FILLA_OPEN_POPUP_PAGE") {
+    const url = typeof message.url === "string" ? message.url : "";
+    if (!url) {
+      sendResponse({ success: false, error: "Missing popup URL" });
+      return true;
+    }
+
+    const openFallbackPopupWindow = () => {
+      chrome.windows.create(
+        {
+          url,
+          type: "popup",
+          focused: true,
+          width: 420,
+          height: 640,
+        },
+        (win) => {
+          if (chrome.runtime.lastError) {
+            sendResponse({ success: false, error: chrome.runtime.lastError.message });
+            return;
+          }
+          sendResponse({ success: true, windowId: win?.id || null, mode: "window" });
+        }
+      );
+    };
+
+    // Prefer opening the real extension popup UI (same as toolbar icon click).
+    if (chrome.action && typeof chrome.action.openPopup === "function") {
+      Promise.resolve(chrome.action.openPopup())
+        .then(() => {
+          sendResponse({ success: true, mode: "action-popup" });
+        })
+        .catch(() => {
+          openFallbackPopupWindow();
+        });
+      return true;
+    }
+
+    openFallbackPopupWindow();
+    return true;
+  }
+
   if (message.type === "FILLA_FETCH_RESUME") {
     handleFetchResume(message.resumeUrl)
       .then(result => sendResponse(result))

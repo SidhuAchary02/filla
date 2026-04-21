@@ -38,6 +38,17 @@
     }
   }
 
+  async function openExtensionPopupPage() {
+    const popupUrl = safeRuntimeUrl("popup.html");
+    if (!popupUrl) return;
+
+    const resp = await sendMessageAsync({ type: "FILLA_OPEN_POPUP_PAGE", url: popupUrl });
+    if (!resp?.success) {
+      // Fallback: open directly from page context if background route fails.
+      window.open(popupUrl, "_blank", "noopener,noreferrer");
+    }
+  }
+
   /* ═══════════════════════════════════════════════════════════════
      FLOATING UI
   ═══════════════════════════════════════════════════════════════ */
@@ -52,7 +63,7 @@
     const logo = document.createElement("img");
     logo.id = "filla-floating-logo";
     const primaryLogoSrc = safeRuntimeUrl("logo-2.png");
-    const fallbackLogoSrc = safeRuntimeUrl("logo-2.png");
+    const fallbackLogoSrc = safeRuntimeUrl("logo.png");
     if (!primaryLogoSrc && !fallbackLogoSrc) return;
     logo.src = primaryLogoSrc; // packaged extension logo
     logo.onerror = () => {
@@ -79,9 +90,9 @@
     });
 
     // optional click action
-    logo.onclick = () => {
+    logo.onclick = async () => {
       console.log("Filla icon clicked");
-      // trigger your autofill or UI here
+      await openExtensionPopupPage();
     };
 
     document.body.appendChild(logo);
