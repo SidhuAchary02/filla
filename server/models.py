@@ -219,3 +219,13 @@ class CurrentUserResponse(BaseModel):
     email: str
     user_id: str
     profile: Optional[UserProfileResponse] = None
+
+
+# ============ EXTENSION AI MODELS ============
+class GenerateAnswerRequest(BaseModel):
+    question: str = Field(..., min_length=5, max_length=1200)
+    company_name: Optional[str] = Field(default=None, max_length=200)
+
+
+class GenerateAnswerResponse(BaseModel):
+    answer: str

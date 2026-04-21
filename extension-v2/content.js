@@ -54,14 +54,18 @@
   ═══════════════════════════════════════════════════════════════ */
 
   function createFloatingLogo() {
-    // remove if already exists
+    // keep existing instance to avoid click misses from frequent DOM re-creation
     const existing = document.getElementById("filla-floating-logo");
-    if (existing) existing.remove();
+    if (existing) return;
     // remove legacy complex loader if present, so only one icon is visible
     document.getElementById("filla-complex-loader")?.remove();
 
+    const button = document.createElement("button");
+    button.id = "filla-floating-logo";
+    button.type = "button";
+    button.setAttribute("aria-label", "Open Filla popup");
+
     const logo = document.createElement("img");
-    logo.id = "filla-floating-logo";
     const primaryLogoSrc = safeRuntimeUrl("logo-2.png");
     const fallbackLogoSrc = safeRuntimeUrl("logo.png");
     if (!primaryLogoSrc && !fallbackLogoSrc) return;
@@ -74,28 +78,38 @@
       console.warn("[Filla] Logo failed to load from extension package");
     };
 
-    Object.assign(logo.style, {
+    Object.assign(button.style, {
       position: "fixed",
       top: "16px",
       right: "0px", // attached to right edge
       width: "60px", // small size
       height: "50px",
-      objectFit: "contain",
       zIndex: "2147483647",
       cursor: "pointer",
       padding: "6px",
       background: "#fff",
+      border: "none",
       borderRadius: "8px 0 0 8px", // rounded only on left
       boxShadow: "0 4px 12px rgba(95,36,15,0.35)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
     });
 
-    // optional click action
-    logo.onclick = async () => {
+    Object.assign(logo.style, {
+      width: "100%",
+      height: "100%",
+      objectFit: "contain",
+      pointerEvents: "none",
+    });
+
+    button.onclick = () => {
       console.log("Filla icon clicked");
-      await openExtensionPopupPage();
+      openExtensionPopupPage();
     };
 
-    document.body.appendChild(logo);
+    button.appendChild(logo);
+    document.body.appendChild(button);
   }
 
   function removeFloatingLogo() {
@@ -147,7 +161,7 @@
     let debounce = null;
     const observer = new MutationObserver(() => {
       clearTimeout(debounce);
-      debounce = setTimeout(refresh, 200);
+      debounce = setTimeout(refresh, 500);
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
     setTimeout(() => observer.disconnect(), 120000);
@@ -805,10 +819,195 @@
     return null;
   }
 
+  function extractQuestionText(el, fingerprint = "") {
+    const parts = [];
+    const id = el.getAttribute("id") || "";
+    if (id) {
+      const forLabel = document.querySelector(`label[for="${id}"]`);
+      if (forLabel?.innerText) parts.push(forLabel.innerText);
+    }
+
+    const wrapLabel = el.closest("label");
+    if (wrapLabel?.innerText) parts.push(wrapLabel.innerText);
+
+    const legend = el.closest("fieldset")?.querySelector("legend");
+    if (legend?.innerText) parts.push(legend.innerText);
+
+    const aria = el.getAttribute("aria-label") || "";
+    const placeholder = el.getAttribute("placeholder") || "";
+    if (aria) parts.push(aria);
+    if (placeholder) parts.push(placeholder);
+
+    const nearbyHeading = el.closest("div,section,article")?.querySelector("h1,h2,h3,h4,p,strong");
+    if (nearbyHeading?.innerText) parts.push(nearbyHeading.innerText);
+
+    if (fingerprint) parts.push(fingerprint);
+
+    const joined = parts
+      .map((p) => String(p || "").trim())
+      .filter(Boolean)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    return joined.slice(0, 900);
+  }
+
+  function extractCompanyName() {
+    const title = String(document.title || "").trim();
+    const og = document.querySelector('meta[property="og:site_name"],meta[name="application-name"]')?.getAttribute("content") || "";
+    const host = String(location.hostname || "")
+      .replace(/^www\./, "")
+      .split(".")[0]
+      .replace(/[-_]/g, " ")
+      .trim();
+
+    if (og) return og;
+    const titleCandidate = title.split("|")[0]?.split("-")[0]?.trim();
+    if (titleCandidate && titleCandidate.length <= 80) return titleCandidate;
+    return host || "this company";
+  }
+
+  function isOpenEndedTextarea(el, fingerprint = "") {
+    if (el.tagName.toLowerCase() !== "textarea") return false;
+    const text = FM.normalize([
+      fingerprint,
+      el.getAttribute("aria-label") || "",
+      el.getAttribute("placeholder") || "",
+      el.name || "",
+      el.id || "",
+      el.closest("label,fieldset,section,div")?.innerText?.slice(0, 220) || "",
+    ].join(" "));
+
+    return /(why|motivation|tell us|describe|explain|cover letter|about yourself|interested|excited|fit|join|challenge|accomplishment)/.test(text);
+  }
+
+  function shouldUseAIFallbackForUnknownField(el, fingerprint = "") {
+    const tag = el.tagName.toLowerCase();
+    const type = (el.getAttribute("type") || "text").toLowerCase();
+    if (tag !== "textarea" && !(tag === "input" && ["text", "search"].includes(type))) {
+      return false;
+    }
+
+    const text = FM.normalize([
+      fingerprint,
+      el.getAttribute("aria-label") || "",
+      el.getAttribute("placeholder") || "",
+      el.name || "",
+      el.id || "",
+    ].join(" "));
+
+    return text.length > 24 && /(which|what|why|tell|describe|explain|despite|requires|statement|question|type here|\?)/.test(text);
+  }
+
+  function deriveUnknownFieldFallbackValue(el, userData, fingerprint = "") {
+    const fp = FM.normalize(String(fingerprint || ""));
+    const p = userData.profile || {};
+
+    if (/(current or last company|last company|company you worked|current company)/.test(fp)) {
+      const work = p.work_experience || [];
+      const company = work.find((w) => w && typeof w === "object" && w.company)?.company;
+      return String(company || "").trim();
+    }
+
+    if (/(desired work location|work location|timezone|time zone|physically located)/.test(fp)) {
+      const loc = p.location || {};
+      return [loc.city, loc.state, loc.country].filter(Boolean).join(", ");
+    }
+
+    if (/(linkedin)/.test(fp)) return String(p.links?.linkedin || "");
+    if (/(github)/.test(fp)) return String(p.links?.github || "");
+    return "";
+  }
+
+  async function generateAndFillOpenAnswer(el, fingerprint = "") {
+    const question = extractQuestionText(el, fingerprint);
+    if (!question || question.length < 6) return false;
+
+    _complexPromptSeen = true;
+    showComplexLoader();
+    uiLog("🧠 Generating AI answer...");
+
+    const companyName = extractCompanyName();
+    const resp = await sendMessageAsync({
+      type: "FILLA_GENERATE_ANSWER",
+      question,
+      companyName,
+    });
+
+    if (!resp?.success || !resp?.answer) {
+      uiLog(`⚠️ AI answer failed: ${resp?.error || "unknown"}`);
+      return false;
+    }
+
+    if (el.tagName.toLowerCase() === "textarea") {
+      fillTextarea(el, resp.answer);
+    } else {
+      fillText(el, resp.answer);
+    }
+    uiLog("✅ AI answer inserted");
+    return true;
+  }
+
+  function radioOptionText(radio) {
+    const byFor = radio.id ? document.querySelector(`label[for="${radio.id}"]`)?.innerText || "" : "";
+    const wrap = radio.closest("label")?.innerText || "";
+    const par = radio.parentElement?.innerText || "";
+    return String(byFor || wrap || par || radio.value || "").trim();
+  }
+
+  function pickRadioByLetter(radios, letter) {
+    const target = String(letter || "").trim().toLowerCase();
+    if (!target) return false;
+    const letterPattern = new RegExp(`(^|\\s|\\()${target}(\\)|\\.|:|-|\\s)`, "i");
+
+    for (const r of radios) {
+      const txt = FM.normalize(radioOptionText(r));
+      if (letterPattern.test(txt)) {
+        r.click();
+        uiLog(`✅ radio fallback picked option ${target.toUpperCase()}`);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function pickRadioFallbackLetter(fingerprint, userData) {
+    const fp = FM.normalize(String(fingerprint || ""));
+    const p = userData.profile || {};
+    const workCount = Array.isArray(p.work_experience) ? p.work_experience.length : 0;
+    const skillsRaw = Array.isArray(p.skills) ? p.skills : [];
+    const skills = skillsRaw.map((s) => FM.normalize(typeof s === "string" ? s : (s?.name || s?.normalized || ""))).join(" ");
+    const country = FM.normalize(p.location?.country || "");
+
+    if (fp.includes("professional experience in software engineering")) {
+      if (workCount <= 2) return "a";
+      if (workCount <= 4) return "b";
+      return "c";
+    }
+
+    if (fp.includes("generative ai") || fp.includes("llm") || fp.includes("agentic")) {
+      if (/(generative ai|llm|agent|langchain|rag|openai|groq)/.test(skills)) return "c";
+      return "b";
+    }
+
+    if (fp.includes("cloud") || fp.includes("gcp") || fp.includes("terraform") || fp.includes("grpc") || fp.includes("pub/sub")) {
+      if (/(python|react|node|backend|fullstack|gcp|aws|terraform|grpc|rest)/.test(skills)) return "c";
+      return "b";
+    }
+
+    if (fp.includes("physically located") && fp.includes("timezone")) {
+      if (country.includes("united states") || country === "usa" || country.includes("canada")) return "a";
+      return "b";
+    }
+
+    return "";
+  }
+
   /* ═══════════════════════════════════════════════════════════════
      PROCESS ONE FIELD
   ═══════════════════════════════════════════════════════════════ */
-  function processField(el, userData) {
+  async function processField(el, userData) {
     const tag  = el.tagName.toLowerCase();
     const type = (el.getAttribute("type") || "text").toLowerCase();
 
@@ -836,17 +1035,25 @@
 
     const key = FM.matchKey(fp);
 
-    const looksEssayPrompt = tag === "textarea" &&
-      /(why|hardest problem|be specific|motivation|what'?s|what is|excites you)/.test(fp);
-    if (looksEssayPrompt) {
-      _complexPromptSeen = true;
-      showComplexLoader();
-      uiLog("🧠 Complex question detected — showing smart loader");
-      ensureUnknownFieldAIBtn(el, fp);
+    if (isOpenEndedTextarea(el, fp)) {
+      const filled = await generateAndFillOpenAnswer(el, fp);
+      if (!filled) ensureUnknownFieldAIBtn(el, fp);
       return;
     }
 
     if (!key) {
+      const fallbackValue = deriveUnknownFieldFallbackValue(el, userData, fp);
+      if (fallbackValue) {
+        fillText(el, fallbackValue);
+        uiLog("✅ Filled unknown field via fallback rules");
+        return;
+      }
+
+      if (shouldUseAIFallbackForUnknownField(el, fp)) {
+        const filled = await generateAndFillOpenAnswer(el, fp);
+        if (filled) return;
+      }
+
       ensureUnknownFieldAIBtn(el, fp);
       console.log(`[Filla] ❓ "${fp.slice(0, 60)}"`);
       return;
@@ -928,7 +1135,11 @@
       const legendText = radios[0].closest("fieldset")?.querySelector("legend")?.innerText || "";
       const fp  = FM.extractFingerprint(radios[0]) + " " + FM.normalize(legendText);
       const key = FM.matchKey(fp.trim());
-      if (!key) continue;
+      if (!key) {
+        const letter = pickRadioFallbackLetter(fp, userData);
+        if (letter) pickRadioByLetter(radios, letter);
+        continue;
+      }
 
       const ctx  = detectSection(radios[0]);
       const raw  = FM.resolveValue(key, userData, ctx);
@@ -1229,7 +1440,7 @@
     for (let i = 0; i < fields.length; i++) {
       showUI("Filling fields…", `${i + 1} / ${fields.length}`);
       await delay(60);
-      processField(fields[i], userData);
+      await processField(fields[i], userData);
     }
 
     // 2. Radio groups

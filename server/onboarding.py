@@ -1,6 +1,13 @@
 from fastapi import APIRouter, HTTPException, status, Header, Query, Response
-from models import OnboardingRequest, OnboardingResponse, PersonalInfoRequest
+from models import (
+    OnboardingRequest,
+    OnboardingResponse,
+    PersonalInfoRequest,
+    GenerateAnswerRequest,
+    GenerateAnswerResponse,
+)
 from database import supabase_client
+from config import settings
 from datetime import datetime
 from normalizer import normalize_profile
 import json
@@ -173,6 +180,140 @@ def _compute_normalized_profile(profile: dict) -> dict:
 def _infer_media_type_from_name(file_name: str) -> str:
     guessed, _ = mimetypes.guess_type(file_name or "")
     return guessed or "application/octet-stream"
+
+
+def _infer_company_name_from_profile_or_question(profile: dict, question: str, explicit_company: str | None) -> str:
+    company = str(explicit_company or "").strip()
+    if company:
+        return company
+
+    role = str(profile.get("role") or "").strip()
+    if role:
+        return role
+
+    q = str(question or "").strip().split("?")[0]
+    return q[:80] if q else "this company"
+
+
+def _build_resume_context(profile: dict, email: str | None) -> str:
+    location = profile.get("location") or {}
+    links = profile.get("links") or {}
+    work = profile.get("work_experience") or []
+    education = profile.get("education") or []
+    skills = profile.get("skills") or []
+
+    skill_names = []
+    for s in skills:
+        if isinstance(s, dict):
+            n = s.get("name") or s.get("normalized")
+            if n:
+                skill_names.append(str(n))
+        elif s:
+            skill_names.append(str(s))
+
+    work_lines = []
+    for w in work[:3]:
+        if not isinstance(w, dict):
+            continue
+        title = str(w.get("title") or "").strip()
+        company = str(w.get("company") or "").strip()
+        desc = str(w.get("description") or "").strip()
+        line = " - ".join([x for x in [title, company] if x])
+        if desc:
+            line = f"{line}: {desc[:180]}"
+        if line:
+            work_lines.append(line)
+
+    edu_lines = []
+    for e in education[:2]:
+        if not isinstance(e, dict):
+            continue
+        school = str(e.get("school") or "").strip()
+        degree = str(e.get("degree") or "").strip()
+        major = str(e.get("major") or "").strip()
+        line = " - ".join([x for x in [degree, major, school] if x])
+        if line:
+            edu_lines.append(line)
+
+    location_text = ", ".join([str(location.get(k) or "").strip() for k in ["city", "state", "country"] if location.get(k)])
+
+    parts = [
+        f"Name: {str(profile.get('preferred_name') or profile.get('first_name') or '').strip()}",
+        f"Email: {str(email or '').strip()}",
+        f"Role: {str(profile.get('role') or '').strip()}",
+        f"Experience level: {str(profile.get('experience_level') or '').strip()}",
+        f"Location: {location_text}",
+        f"Skills: {', '.join(skill_names[:20])}",
+        f"Work experience: {' | '.join(work_lines)}",
+        f"Education: {' | '.join(edu_lines)}",
+        f"Links: LinkedIn={str(links.get('linkedin') or '').strip()}, GitHub={str(links.get('github') or '').strip()}, Portfolio={str(links.get('portfolio') or '').strip()}",
+    ]
+    return "\n".join([p for p in parts if p and not p.endswith(": ")])
+
+
+async def _generate_with_groq(question: str, company_name: str, resume_context: str) -> str:
+    if not settings.groq_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Missing GROQ_API_KEY on server",
+        )
+
+    system_prompt = (
+        "You write concise, tailored job application responses. "
+        "Use only provided resume context. Keep tone confident and natural. "
+        "Return plain text only, no markdown."
+    )
+
+    user_prompt = (
+        f"Company: {company_name}\n"
+        f"Question: {question}\n\n"
+        "Candidate resume context:\n"
+        f"{resume_context}\n\n"
+        "Write a high-quality response in 3-5 sentences. "
+        "Make it specific to the company and question."
+    )
+
+    payload = {
+        "model": settings.groq_model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": 0.4,
+        "max_tokens": 260,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {settings.groq_api_key}",
+        "Content-Type": "application/json",
+    }
+
+    url = f"{settings.groq_base_url.rstrip('/')}/chat/completions"
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        resp = await client.post(url, headers=headers, json=payload)
+
+    if resp.status_code >= 400:
+        msg = "Groq request failed"
+        try:
+            err = resp.json()
+            msg = err.get("error", {}).get("message") or msg
+        except Exception:
+            pass
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=msg)
+
+    data = resp.json()
+    answer = (
+        data.get("choices", [{}])[0]
+        .get("message", {})
+        .get("content", "")
+        .strip()
+    )
+    if not answer:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI returned an empty response",
+        )
+    return answer
 
 
 # ============ SUBMIT ONBOARDING ============
@@ -659,4 +800,43 @@ async def get_extension_resume_file(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to load resume file: {str(e)}",
+        )
+
+
+@router.post("/extension/generate-answer", response_model=GenerateAnswerResponse)
+async def generate_extension_answer(
+    request: GenerateAnswerRequest,
+    authorization: str = Header(None),
+):
+    """Generate tailored answer for open-ended application questions."""
+    user_id = verify_token(authorization)
+
+    try:
+        profile = _ensure_profile_exists(user_id)
+
+        email = None
+        try:
+            token = authorization.replace("Bearer ", "")
+            auth_user = supabase_client.auth.get_user(token)
+            if auth_user and auth_user.user:
+                email = getattr(auth_user.user, "email", None)
+        except Exception:
+            email = None
+
+        question = str(request.question or "").strip()
+        if len(question) < 5:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Question is too short")
+
+        company_name = _infer_company_name_from_profile_or_question(profile, question, request.company_name)
+        resume_context = _build_resume_context(profile, email)
+        answer = await _generate_with_groq(question, company_name, resume_context)
+
+        return GenerateAnswerResponse(answer=answer)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate answer: {str(e)}",
         )

@@ -173,6 +173,65 @@ async function handleFetchResume(resumeUrl) {
   return { success: true, ...proxied };
 }
 
+async function handleGenerateAnswer(question, companyName) {
+  const q = String(question || "").trim();
+  const c = String(companyName || "").trim();
+  const startedAt = Date.now();
+
+  if (!q || q.length < 5) {
+    return { success: false, error: "Question is too short" };
+  }
+
+  const token = await getStoredToken();
+  if (!token) {
+    return { success: false, error: "Missing auth token. Please sign in." };
+  }
+
+  try {
+    console.log("[Filla BG] 🧠 AI call start", {
+      company: c || "",
+      questionPreview: q.slice(0, 140),
+      questionLength: q.length,
+    });
+
+    const resp = await fetch(`${FILLA_API_BASE}/api/extension/generate-answer`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": asBearer(token),
+      },
+      body: JSON.stringify({
+        question: q,
+        company_name: c || null,
+      }),
+    });
+
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      console.warn("[Filla BG] ⚠️ AI call failed", {
+        status: resp.status,
+        detail: data?.detail || data?.message || "unknown",
+        elapsedMs: Date.now() - startedAt,
+      });
+      return { success: false, error: data?.detail || data?.message || `HTTP ${resp.status}` };
+    }
+
+    const answer = String(data?.answer || "").trim();
+    console.log("[Filla BG] ✅ AI call success", {
+      elapsedMs: Date.now() - startedAt,
+      answerPreview: answer.slice(0, 180),
+      answerLength: answer.length,
+    });
+    return { success: true, answer };
+  } catch (err) {
+    console.error("[Filla BG] ❌ AI call exception", {
+      error: err?.message || "unknown",
+      elapsedMs: Date.now() - startedAt,
+    });
+    return { success: false, error: err?.message || "AI request failed" };
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════
    MESSAGE ROUTER
 ═══════════════════════════════════════════════════════════════ */
@@ -226,6 +285,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .catch(err => {
         console.error("[Filla BG] ❌ Resume fetch exception:", err);
         sendResponse({ success: false, error: err?.message || "Unknown error" });
+      });
+    return true;
+  }
+
+  if (message.type === "FILLA_GENERATE_ANSWER") {
+    handleGenerateAnswer(message.question, message.companyName)
+      .then(result => sendResponse(result))
+      .catch(err => {
+        sendResponse({ success: false, error: err?.message || "AI request exception" });
       });
     return true;
   }
