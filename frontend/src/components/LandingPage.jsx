@@ -121,12 +121,13 @@ function LandingPage() {
                                     >
                                         Create free account
                                     </Link>
-                                    <Link
-                                        to="/login"
+                                    {/* <Link
+                                        to=""
+                                        target='_blank'
                                         className="  border border-[#d9cebc] bg-[color-mix(in_srgb,white_78%,transparent)] px-5 py-3 text-[0.98rem] font-bold text-[#1f1c17] transition hover:-translate-y-0.5"
                                     >
-                                        Log in
-                                    </Link>
+                                        download extension
+                                    </Link> */}
                                 </>
                             )
                         )}
