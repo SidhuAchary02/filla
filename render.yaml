@@ -2,6 +2,6 @@ services:
   - type: web
     name: filla-backend
     env: python
-    runtime: python-3.11.9
+    runtime: python-3.11
     buildCommand: cd server && pip install -r requirements.txt
     startCommand: cd server && uvicorn main:app --host 0.0.0.0 --port 10000
