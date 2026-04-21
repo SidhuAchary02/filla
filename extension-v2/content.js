@@ -22,57 +22,134 @@
   "use strict";
 
   let _logLines = [];
+  let _complexPromptSeen = false;
 
   if (window.__fillaV4Loaded) return;
   window.__fillaV4Loaded = true;
 
   const FM = window.FillaFieldMapper;
 
+  function safeRuntimeUrl(path) {
+    try {
+      if (!chrome?.runtime?.id || typeof chrome.runtime.getURL !== "function") return "";
+      return chrome.runtime.getURL(path);
+    } catch (_) {
+      return "";
+    }
+  }
+
   /* ═══════════════════════════════════════════════════════════════
      FLOATING UI
   ═══════════════════════════════════════════════════════════════ */
-  (function injectStyles() {
-    const s = document.createElement("style");
-    s.textContent = `
-      #filla-ui{position:fixed;top:20px;right:20px;width:280px;background:#fff7f3;
-        border:1px solid #da5a2a;border-radius:16px;padding:14px;
-        z-index:2147483647;font-family:'DM Sans',system-ui,sans-serif;color:#1f1c17;
-        box-shadow:0 10px 28px rgba(158,47,9,0.16);transition:all .2s ease;font-size:13px}
-      #filla-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-      #filla-logo{width:28px;height:28px;object-fit:contain;display:block;flex-shrink:0}
-      #filla-title{font-size:13px;font-weight:600}
-      #filla-status{font-size:11px;color:#9e2f09;margin-top:2px}
-      #filla-progress{font-size:11px;color:#9e2f09;min-height:14px;margin-top:4px;font-weight:700}
-      #filla-log{margin-top:8px;max-height:90px;overflow-y:auto;font-size:10px;
-        color:#9e2f09;line-height:1.7;
-        border-top:1px solid #f0cdbf;padding-top:6px}
-      .filla-resume-hint{margin-top:8px;padding:9px 11px;
-        background:#fff7f3;border:1px solid #da5a2a;
-        border-radius:10px;font-size:12px;color:#9e2f09;line-height:1.5;
-        font-family:'DM Sans',system-ui,sans-serif}
-      .filla-resume-hint strong{color:#9e2f09}
-      .filla-resume-hint a{color:#9e2f09;text-decoration:underline}
-      .filla-resume-hint small{color:#9e2f09}
-      .filla-ai-btn-wrap{position:relative;display:block}
-      .filla-ai-btn{position:absolute;top:6px;right:6px;z-index:2;
-        border:1px solid #da5a2a;background:#fff7f3;color:#9e2f09;
-        border-radius:999px;padding:2px 8px;font-size:10px;line-height:1.3;
-        font-family:'DM Sans',system-ui,sans-serif;cursor:pointer}
-      .filla-ai-btn:hover{background:#ffe9de}
-      .filla-ai-inline{margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-      .filla-ai-inline-main{border:none;background:#1da7c7;color:#fff;
-        border-radius:10px;padding:9px 14px;font-size:14px;font-weight:700;
-        font-family:'DM Sans',system-ui,sans-serif;cursor:pointer;line-height:1.2}
-      .filla-ai-inline-main:hover{background:#1591ad}
-      .filla-ai-inline-cancel{background:transparent;border:none;color:#d33a36;
-        font-size:14px;font-weight:600;font-family:'DM Sans',system-ui,sans-serif;cursor:pointer}
-      .filla-ai-inline-tokens{margin-left:auto;border:1px solid #d9d9df;background:#f8fafc;color:#1f2937;
-        border-radius:10px;padding:8px 12px;font-size:11px;display:flex;align-items:center;gap:6px;
-        font-family:'DM Sans',system-ui,sans-serif}
-      .filla-ai-inline-dot{width:16px;height:16px;border-radius:50%;border:2px solid #1da7c7;display:inline-block}
-    `;
-    document.head.appendChild(s);
-  })();
+
+  function createFloatingLogo() {
+    // remove if already exists
+    const existing = document.getElementById("filla-floating-logo");
+    if (existing) existing.remove();
+    // remove legacy complex loader if present, so only one icon is visible
+    document.getElementById("filla-complex-loader")?.remove();
+
+    const logo = document.createElement("img");
+    logo.id = "filla-floating-logo";
+    const primaryLogoSrc = safeRuntimeUrl("logo-2.png");
+    const fallbackLogoSrc = safeRuntimeUrl("logo-2.png");
+    if (!primaryLogoSrc && !fallbackLogoSrc) return;
+    logo.src = primaryLogoSrc; // packaged extension logo
+    logo.onerror = () => {
+      if (fallbackLogoSrc && logo.src !== fallbackLogoSrc) {
+        logo.src = fallbackLogoSrc;
+        return;
+      }
+      console.warn("[Filla] Logo failed to load from extension package");
+    };
+
+    Object.assign(logo.style, {
+      position: "fixed",
+      top: "16px",
+      right: "0px", // attached to right edge
+      width: "60px", // small size
+      height: "50px",
+      objectFit: "contain",
+      zIndex: "2147483647",
+      cursor: "pointer",
+      padding: "6px",
+      background: "#fff",
+      borderRadius: "8px 0 0 8px", // rounded only on left
+      boxShadow: "0 4px 12px rgba(95,36,15,0.35)",
+    });
+
+    // optional click action
+    logo.onclick = () => {
+      console.log("Filla icon clicked");
+      // trigger your autofill or UI here
+    };
+
+    document.body.appendChild(logo);
+  }
+
+  function removeFloatingLogo() {
+    document.getElementById("filla-floating-logo")?.remove();
+  }
+
+  function getLikelyFillableFields() {
+    return Array.from(document.querySelectorAll(
+      'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="image"]):not([type="reset"]), textarea, select, [role="combobox"], [contenteditable="true"]'
+    )).filter((el) => {
+      if (!(el instanceof HTMLElement)) return false;
+      const isInput = el.tagName.toLowerCase() === "input";
+      if (isInput) {
+        const t = (el.getAttribute("type") || "text").toLowerCase();
+        if (["radio", "checkbox"].includes(t)) return false;
+      }
+      if (el.hasAttribute("disabled") || el.getAttribute("aria-hidden") === "true") return false;
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
+  }
+
+  function isValidAutofillPage() {
+    const fillable = getLikelyFillableFields();
+    if (fillable.length >= 3) return true;
+
+    const pageText = FM.normalize([
+      document.title || "",
+      location.pathname || "",
+      document.body?.innerText?.slice(0, 4000) || "",
+    ].join(" "));
+    const hostPath = FM.normalize(`${location.hostname} ${location.pathname}`);
+    const hasApplyIntent = /(apply|application|job|career|resume|cover letter|workday|greenhouse|lever|ashby|smartrecruiters)/.test(pageText);
+    const jobPlatformPath = /(workday|greenhouse|lever|ashby|smartrecruiters|jobs|careers)/.test(hostPath);
+    return (fillable.length >= 1 && hasApplyIntent) || (fillable.length >= 1 && jobPlatformPath);
+  }
+
+  function applyFloatingLogoForPage() {
+    // Always show the floating logo as requested.
+    createFloatingLogo();
+  }
+
+  function setupFloatingLogoWatcher() {
+    const refresh = () => {
+      applyFloatingLogoForPage();
+    };
+
+    refresh();
+    let debounce = null;
+    const observer = new MutationObserver(() => {
+      clearTimeout(debounce);
+      debounce = setTimeout(refresh, 200);
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    setTimeout(() => observer.disconnect(), 120000);
+  }
+
+  function showComplexLoader() {
+    // Reuse the same floating logo UI to avoid duplicate icons.
+    createFloatingLogo();
+  }
+
+  function hideComplexLoader() {
+    document.getElementById("filla-complex-loader")?.remove();
+  }
 
   function ensureUnknownFieldAIBtn(el, fingerprint = "") {
     return;
@@ -95,10 +172,11 @@
   }
   function showUI(status, progress = "") {
     const box = getBox();
+    const headerLogoSrc = safeRuntimeUrl("logo-2.png");
     box.style.cssText = "";
     box.innerHTML = `
       <div id="filla-header">
-        <img src="${chrome.runtime.getURL("logo-2.png")}" alt="Filla Logo" id="filla-logo">
+        <img src="${headerLogoSrc}" alt="Filla Logo" id="filla-logo">
         <div><div id="filla-title">Filla Autofill</div>
              <div id="filla-status">${status}</div></div>
       </div>
@@ -750,6 +828,9 @@
     const looksEssayPrompt = tag === "textarea" &&
       /(why|hardest problem|be specific|motivation|what'?s|what is|excites you)/.test(fp);
     if (looksEssayPrompt) {
+      _complexPromptSeen = true;
+      showComplexLoader();
+      uiLog("🧠 Complex question detected — showing smart loader");
       ensureUnknownFieldAIBtn(el, fp);
       return;
     }
@@ -1121,6 +1202,9 @@
   ═══════════════════════════════════════════════════════════════ */
   async function startAutofillPipeline(userData) {
     _logLines = [];
+    _complexPromptSeen = false;
+    removeFloatingLogo();
+    hideComplexLoader();
     console.log("[Filla v4] 🚀 Pipeline start");
     showUI("Scanning form…");
     await delay(200);
@@ -1164,9 +1248,15 @@
     // 8. Unknown/unmapped fields AI stubs
     injectUnknownAIButtons(userData);
 
+    if (_complexPromptSeen) {
+      uiLog("🧠 Complex question left for AI/manual completion");
+    }
+
     showUI("✅ Done!", `${fields.length} fields processed`);
     uiLog("Pipeline complete");
     hideUI();
+    hideComplexLoader();
+    applyFloatingLogoForPage();
 
     console.log("[Filla v4] ✅ Pipeline complete");
   }
@@ -1191,5 +1281,10 @@
   }
 
   chrome.runtime.onMessage.addListener(handleMessage);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", setupFloatingLogoWatcher, { once: true });
+  } else {
+    setupFloatingLogoWatcher();
+  }
   console.log("[Filla v4] 🟢 Content script loaded");
 })();

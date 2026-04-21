@@ -30,6 +30,12 @@
       "run_at": "document_idle"
     }
   ],
+  "web_accessible_resources": [
+    {
+      "resources": ["logo-2.png", "logo.png"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "icons": {
     "16": "logo-2.png",
     "32": "logo-2.png",
