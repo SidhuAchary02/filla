@@ -212,7 +212,7 @@
   /* ═══════════════════════════════════════════════════════════════
      UTILITIES
   ═══════════════════════════════════════════════════════════════ */
-  const delay  = ms => new Promise(r => setTimeout(r, ms));
+  const delay = ms => new Promise(r => setTimeout(r, ms));
   const scroll = el => el.scrollIntoView({ behavior: "smooth", block: "center" });
 
   function sendMessageAsync(message) {
@@ -249,10 +249,10 @@
       const t = String(contentType || "").toLowerCase();
       const ext = t.includes("pdf") ? "pdf"
         : t.includes("msword") ? "doc"
-        : t.includes("wordprocessingml") ? "docx"
-        : t.includes("rtf") ? "rtf"
-        : t.includes("opendocument") ? "odt"
-        : "pdf";
+          : t.includes("wordprocessingml") ? "docx"
+            : t.includes("rtf") ? "rtf"
+              : t.includes("opendocument") ? "odt"
+                : "pdf";
       name = `resume.${ext}`;
     }
     return name;
@@ -308,13 +308,13 @@
   // React / Vue / Angular compatible event dispatch
   function fire(el) {
     try {
-      const proto  = Object.getPrototypeOf(el);
+      const proto = Object.getPrototypeOf(el);
       const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
       if (setter) setter.call(el, el.value);
-    } catch (_) {}
-    el.dispatchEvent(new Event("input",  { bubbles: true }));
+    } catch (_) { }
+    el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
-    el.dispatchEvent(new Event("blur",   { bubbles: true }));
+    el.dispatchEvent(new Event("blur", { bubbles: true }));
   }
 
   /* ═══════════════════════════════════════════════════════════════
@@ -329,17 +329,17 @@
        • "Education 1 / 2 …"
   ═══════════════════════════════════════════════════════════════ */
   function detectSection(el) {
-    let node  = el.parentElement;
+    let node = el.parentElement;
     let depth = 0;
 
     while (node && depth < 15) {
       // Only look at heading-like elements or reasonably small containers
       const headings = node.querySelectorAll
         ? Array.from(node.querySelectorAll("h1,h2,h3,h4,h5,legend,label,p,span,div"))
-            .filter(h => {
-              const t = (h.innerText || h.textContent || "").trim();
-              return t.length > 0 && t.length < 80 && !h.querySelector("input,select,textarea");
-            })
+          .filter(h => {
+            const t = (h.innerText || h.textContent || "").trim();
+            return t.length > 0 && t.length < 80 && !h.querySelector("input,select,textarea");
+          })
         : [];
 
       for (const h of headings) {
@@ -354,12 +354,10 @@
         if (en) return { section: "education", index: parseInt(en[1]) - 1 };
 
         // Work section — unnumbered: "experience details" / "work experience"
-        if (t === "experience details" || t === "work experience" || t === "employment details") {
+        if (t.includes("experience detail") || t.includes("work experience") || t.includes("employment detail")) {
           return { section: "work", index: 0 };
         }
-
-        // Education — unnumbered: "education details"
-        if (t === "education details" || t === "education" || t === "academic details") {
+        if (t.includes("education detail") || t === "education" || t.includes("academic detail")) {
           return { section: "education", index: 0 };
         }
       }
@@ -376,13 +374,13 @@
      Maps profile degree strings → synonyms for select matching
   ═══════════════════════════════════════════════════════════════ */
   const DEGREE_ALIASES = {
-    "b.tech":  ["bachelor", "b.tech", "btech", "b.e", "be ", "engineering", "b.sc", "bsc", "b tech"],
-    "m.tech":  ["master", "m.tech", "mtech", "m.e", "me "],
-    "mba":     ["mba", "master of business"],
-    "phd":     ["phd", "doctorate", "ph.d"],
+    "b.tech": ["bachelor", "b.tech", "btech", "b.e", "be ", "engineering", "b.sc", "bsc", "b tech"],
+    "m.tech": ["master", "m.tech", "mtech", "m.e", "me "],
+    "mba": ["mba", "master of business"],
+    "phd": ["phd", "doctorate", "ph.d"],
     "diploma": ["diploma"],
-    "10th":    ["10th", "ssc", "secondary"],
-    "12th":    ["12th", "hsc", "higher secondary", "intermediate"],
+    "10th": ["10th", "ssc", "secondary"],
+    "12th": ["12th", "hsc", "higher secondary", "intermediate"],
   };
   function degreeSynonyms(degree) {
     const d = FM.normalize(degree);
@@ -424,10 +422,10 @@
   function fillDate(el, isoDateStr, forceFormat) {
     if (!isoDateStr) return;
     const type = (el.getAttribute("type") || "text").toLowerCase();
-    const ph   = FM.normalize(el.placeholder || "");
+    const ph = FM.normalize(el.placeholder || "");
 
-    if (type === "date")  { el.value = isoDateStr.slice(0, 10); fire(el); return; }
-    if (type === "month") { el.value = isoDateStr.slice(0, 7);  fire(el); return; }
+    if (type === "date") { el.value = isoDateStr.slice(0, 10); fire(el); return; }
+    if (type === "month") { el.value = isoDateStr.slice(0, 7); fire(el); return; }
 
     // Text input — detect format
     let formatted;
@@ -495,8 +493,8 @@
       if (n === "indian") rawValue = "India";
     }
 
-    const target   = FM.normalize(rawValue);
-    const synonyms = key === "degree" ? degreeSynonyms(value) : [target];
+    const target = FM.normalize(rawValue);
+    const synonyms = (key === "degree" || key === "course") ? degreeSynonyms(value) : [target];
 
     const isCountryLike = key === "nationality" || key === "country";
     const isPhoneCodeLike = key === "phone_country_code";
@@ -577,8 +575,8 @@
         ? (t === target || v === target || hasWholeWord(t, target) || hasWholeWord(v, target))
         : false;
       const direct = countryDirect || t === target || v === target ||
-                     (!isCountryLike && target.length > 2 && (t.includes(target) || target.includes(t)));
-      const syn    = synonyms.some(s => s.length > 1 && (t.includes(s) || v.includes(s)));
+        (!isCountryLike && target.length > 2 && (t.includes(target) || target.includes(t)));
+      const syn = synonyms.some(s => s.length > 1 && (t.includes(s) || v.includes(s)));
 
       if (direct || syn) {
         el.selectedIndex = opt.index;
@@ -589,6 +587,15 @@
     }
     uiLog(`⚠️ select no match: "${el.name || el.id}" for "${value}"`);
     return false;
+  }
+  async function waitForOptions(maxMs = 1500) {
+    const start = Date.now();
+    while (Date.now() - start < maxMs) {
+      const opts = document.querySelectorAll('[role="option"],[role="menuitem"],[role="listitem"]');
+      if (opts.length > 0) return opts;
+      await delay(100);
+    }
+    return document.querySelectorAll('[role="option"],[role="menuitem"],[role="listitem"]');
   }
 
   /* ═══════════════════════════════════════════════════════════════
@@ -601,8 +608,8 @@
       if (n === "indian") rawValue = "India";
     }
 
-    const target   = FM.normalize(rawValue);
-    const synonyms = key === "degree" ? degreeSynonyms(value) : [target];
+    const target = FM.normalize(rawValue);
+    const synonyms = (key === "degree" || key === "course") ? degreeSynonyms(value) : [target];
     const isCountryLike = key === "nationality" || key === "country" || key === "work_auth_general";
     const isPhoneCodeLike = key === "phone_country_code";
 
@@ -704,9 +711,7 @@
     }
 
     trigger.click();
-    await delay(400);
-
-    let options = findOptions();
+    let options = await waitForOptions(1500);
     if (pickFromOptions(options)) {
       await delay(200);
       return true;
@@ -733,11 +738,14 @@
   function fillRadio(radios, value) {
     const target = FM.normalize(String(value));
     for (const r of radios) {
-      const lf = r.id ? (document.querySelector(`label[for="${r.id}"]`)?.innerText || "") : "";
-      const lw = r.closest("label")?.innerText || "";
-      const pp = r.parentElement?.innerText || "";
+      const byFor = r.id ? (document.querySelector(`label[for="${r.id}"]`)?.innerText || "") : "";
+      const wrap = r.closest("label")?.innerText || "";
+      // Only direct text nodes next to the radio, not all sibling content
+      const directText = Array.from((r.parentElement?.childNodes || []))
+        .filter(n => n !== r && n.nodeType === Node.TEXT_NODE)
+        .map(n => n.textContent || "").join(" ");
       const rv = r.value || "";
-      const combined = FM.normalize([lf, lw, pp, rv].join(" "));
+      const combined = FM.normalize([byFor, wrap, directText, rv].join(" "));
 
       if (combined.includes(target) || (FM.normalize(rv).length > 1 && target.includes(FM.normalize(rv)))) {
         r.click();
@@ -754,16 +762,16 @@
   ═══════════════════════════════════════════════════════════════ */
   function fillCheckbox(el, value) {
     const targets = String(value).split(",").map(v => FM.normalize(v.trim()));
-    const elVal   = FM.normalize(el.value || "");
-    const lf      = el.id ? FM.normalize(document.querySelector(`label[for="${el.id}"]`)?.innerText || "") : "";
-    const lw      = FM.normalize(el.closest("label")?.innerText || "");
-    const pp      = FM.normalize(el.parentElement?.innerText || "");
+    const elVal = FM.normalize(el.value || "");
+    const lf = el.id ? FM.normalize(document.querySelector(`label[for="${el.id}"]`)?.innerText || "") : "";
+    const lw = FM.normalize(el.closest("label")?.innerText || "");
+    const pp = FM.normalize(el.parentElement?.innerText || "");
 
     const match = targets.some(t =>
       (elVal && (elVal.includes(t) || t.includes(elVal))) ||
-      (lf    && (lf.includes(t)   || t.includes(lf)))    ||
-      (lw    && (lw.includes(t)   || t.includes(lw)))    ||
-      (pp    && (pp.includes(t)   || t.includes(pp)))
+      (lf && (lf.includes(t) || t.includes(lf))) ||
+      (lw && (lw.includes(t) || t.includes(lw))) ||
+      (pp && (pp.includes(t) || t.includes(pp)))
     );
 
     if (match && !el.checked) {
@@ -779,7 +787,7 @@
   function normalizeValue(key, rawValue, el) {
     if (rawValue === null || rawValue === undefined) return rawValue;
     const type = (el.getAttribute("type") || "").toLowerCase();
-    const ph   = FM.normalize(el.placeholder || "");
+    const ph = FM.normalize(el.placeholder || "");
 
     // Salary fields — number input gets raw number, text gets LPA string
     if (key === "min_salary" || key === "current_ctc") {
@@ -1008,7 +1016,7 @@
      PROCESS ONE FIELD
   ═══════════════════════════════════════════════════════════════ */
   async function processField(el, userData) {
-    const tag  = el.tagName.toLowerCase();
+    const tag = el.tagName.toLowerCase();
     const type = (el.getAttribute("type") || "text").toLowerCase();
 
     if (["submit", "button", "image", "hidden", "reset", "file"].includes(type)) return;
@@ -1016,7 +1024,7 @@
     // Skip non-empty (except selects which often default to "Select One")
     if (tag !== "select" && el.value && el.value.trim() !== "") return;
 
-    const fp  = FM.extractFingerprint(el);
+    const fp = FM.extractFingerprint(el);
     const links = userData.profile?.links || {};
 
     // Hard-priority URL fields to avoid accidental mismatch from nearby labels.
@@ -1080,15 +1088,15 @@
       resolvedKey = "phone_country_code";
     }
     if ((key === "phone" || key === "name_fallback") &&
-        (fp.includes("phone") || fp.includes("mobile") || fp.includes("telephone")) &&
-        !(fp.includes("country code") || fp.includes("dial code") || fp.includes("isd") || fp.includes("calling code"))) {
+      (fp.includes("phone") || fp.includes("mobile") || fp.includes("telephone")) &&
+      !(fp.includes("country code") || fp.includes("dial code") || fp.includes("isd") || fp.includes("calling code"))) {
       resolvedKey = "phone_number_only";
     }
-    if (key === "name_fallback" && ctx.section === "work"  && fp.includes("location")) resolvedKey = "work_location_val";
+    if (key === "name_fallback" && ctx.section === "work" && fp.includes("location")) resolvedKey = "work_location_val";
     if (key === "name_fallback" && ctx.section === "education" && fp.includes("location")) resolvedKey = "edu_location";
 
     let rawVal = FM.resolveValue(resolvedKey, userData, ctx);
-    let value  = normalizeValue(resolvedKey, rawVal, el);
+    let value = normalizeValue(resolvedKey, rawVal, el);
 
     if (value === null || value === undefined || value === "") {
       ensureUnknownFieldAIBtn(el, fp);
@@ -1101,9 +1109,9 @@
     scroll(el);
 
     // Route to correct filler
-    if (tag === "textarea")     return fillTextarea(el, value);
-    if (tag === "select")       return fillSelect(el, value, resolvedKey);
-    if (type === "checkbox")    return fillCheckbox(el, value);
+    if (tag === "textarea") return fillTextarea(el, value);
+    if (tag === "select") return fillSelect(el, value, resolvedKey);
+    if (type === "checkbox") return fillCheckbox(el, value);
     if (type === "date" || type === "month") return fillDate(el, String(rawVal));
 
     // Date text inputs: check by key or placeholder
@@ -1133,17 +1141,21 @@
 
     for (const [, radios] of Object.entries(groups)) {
       const legendText = radios[0].closest("fieldset")?.querySelector("legend")?.innerText || "";
-      const fp  = FM.extractFingerprint(radios[0]) + " " + FM.normalize(legendText);
+      const groupContainer = radios[0].closest('[role="group"], fieldset, .form-group, [class*="field"], [class*="question"], section, div');
+      const containerText = FM.normalize((groupContainer?.innerText || "").slice(0, 300));
+      const fp = FM.extractFingerprint(radios[0]) + " " + FM.normalize(legendText) + " " + containerText;
       const key = FM.matchKey(fp.trim());
+
+
       if (!key) {
         const letter = pickRadioFallbackLetter(fp, userData);
         if (letter) pickRadioByLetter(radios, letter);
         continue;
       }
 
-      const ctx  = detectSection(radios[0]);
-      const raw  = FM.resolveValue(key, userData, ctx);
-      const val  = normalizeValue(key, raw, radios[0]);
+      const ctx = detectSection(radios[0]);
+      const raw = FM.resolveValue(key, userData, ctx);
+      const val = normalizeValue(key, raw, radios[0]);
       if (!val && val !== 0) continue;
 
       fillRadio(radios, val);
@@ -1185,12 +1197,15 @@
     );
 
     for (const dd of combos) {
-      const fp  = FM.extractFingerprint(dd);
+      const fp = FM.extractFingerprint(dd);
       const key = FM.matchKey(fp);
       if (!key) {
         ensureUnknownFieldAIBtn(dd, fp);
         continue;
       }
+
+      document.body.click();
+      await delay(150);
 
       const ctx = detectSection(dd);
       let resolvedKey = key;
@@ -1200,10 +1215,10 @@
       const hasNearbyPhoneInput = !!container?.querySelector?.('input[type="tel"], input[name*="phone" i], input[id*="phone" i]');
       const phoneCountryByContext =
         (hasNearbyPhoneInput ||
-         fp.includes("phone") || fp.includes("mobile") || fp.includes("telephone") || fp.includes("contact") ||
-         nearbyText.includes("phone") || nearbyText.includes("mobile") || nearbyText.includes("telephone")) &&
+          fp.includes("phone") || fp.includes("mobile") || fp.includes("telephone") || fp.includes("contact") ||
+          nearbyText.includes("phone") || nearbyText.includes("mobile") || nearbyText.includes("telephone")) &&
         (fp.includes("country") || fp.includes("code") || fp.includes("dial") || fp.includes("isd") ||
-         nearbyText.includes("country") || nearbyText.includes("code") || nearbyText.includes("dial") || nearbyText.includes("isd"));
+          nearbyText.includes("country") || nearbyText.includes("code") || nearbyText.includes("dial") || nearbyText.includes("isd"));
 
       if (phoneCountryByContext) {
         resolvedKey = "phone_country_code";
@@ -1212,7 +1227,7 @@
       if (key === "country") {
         const fpLower = fp;
         if ((fpLower.includes("phone") || fpLower.includes("mobile") || fpLower.includes("telephone")) &&
-            (fpLower.includes("country code") || fpLower.includes("dial code") || fpLower.includes("isd") || fpLower.includes("calling code"))) {
+          (fpLower.includes("country code") || fpLower.includes("dial code") || fpLower.includes("isd") || fpLower.includes("calling code"))) {
           resolvedKey = "phone_country_code";
         }
       }
@@ -1310,7 +1325,7 @@
     if (!links.length) return;
 
     const addBtns = Array.from(document.querySelectorAll("button,a")).filter(btn => {
-      const txt     = FM.normalize(btn.innerText || "");
+      const txt = FM.normalize(btn.innerText || "");
       const section = FM.normalize(btn.closest("section,div,fieldset")?.innerText?.slice(0, 100) || "");
       return txt === "add" && section.includes("website");
     });
@@ -1403,11 +1418,10 @@
           hint.innerHTML = `✅ <strong>Filla:</strong> Resume attached automatically (${resumeFile.name}).`;
         } else {
           const reason = fetchResult?.error ? `<br><small>${fetchResult.error}</small>` : "";
-          hint.innerHTML = `📎 <strong>Filla:</strong> Upload resume manually.${
-            resumeUrl
-              ? `<br><a href="${resumeUrl}" target="_blank">Open your saved resume ↗</a>${reason}`
-              : ""
-          }`;
+          hint.innerHTML = `📎 <strong>Filla:</strong> Upload resume manually.${resumeUrl
+            ? `<br><a href="${resumeUrl}" target="_blank">Open your saved resume ↗</a>${reason}`
+            : ""
+            }`;
         }
       }
     });

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "filla",
+  "name": "Filla — AI Job Form Autofill Assistant",
   "version": "1.5.0",
-  "description": "Simply automating jobs form filling.",
+  "description": "Automatically fill job applications with one click using your saved profile.",
   "permissions": [
     "activeTab",
     "storage",

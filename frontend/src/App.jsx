@@ -5,6 +5,7 @@ import OnboardingForm from './components/OnboardingForm'
 import Dashboard from './components/Dashboard'
 import ProtectedRoute from './components/ProtectedRoute'
 import LandingPage from './components/LandingPage'
+import { Privacy } from './components/Privacy'
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/signup" element={<SignupForm />} />
         <Route path="/login" element={<LoginForm />} />
+        <Route path="/privacy" element={<Privacy />} />
 
         {/* Protected Routes */}
         <Route
