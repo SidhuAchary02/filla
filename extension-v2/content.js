@@ -80,7 +80,7 @@
 
     Object.assign(button.style, {
       position: "fixed",
-      top: "16px",
+      top: "90px",
       right: "0px", // attached to right edge
       width: "60px", // small size
       height: "50px",
